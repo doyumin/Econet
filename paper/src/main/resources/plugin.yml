@@ -1,0 +1,26 @@
+name: Econet
+description: $description
+prefix: Econet
+version: '${version}'
+
+main: dev.doyu.econet.paper.EconetPlugin
+api-version: '26.3'
+load: POSTWORLD
+
+authors: [ doyumin ]
+website: https://velog.io/@doyu/posts
+
+commands:
+  money:
+    description: Check your account balance
+    usage: /money
+
+  eco:
+    description: Manage the server economy
+    usage: /eco give <player> <amount>
+    permission: econet.admin
+
+permissions:
+  econet.admin:
+    description: Allows managing the Econet economy
+    default: op
