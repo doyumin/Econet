@@ -20,6 +20,10 @@ commands:
     usage: /eco give <player> <amount>
     permission: econet.admin
 
+  pay:
+    description: Transfer money to another player
+    usage: /pay <player> <amount>
+
 permissions:
   econet.admin:
     description: Allows managing the Econet economy

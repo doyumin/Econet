@@ -6,10 +6,11 @@ import org.bukkit.Bukkit
 import org.bukkit.command.Command
 import org.bukkit.command.CommandExecutor
 import org.bukkit.command.CommandSender
+import org.bukkit.command.TabCompleter
 
 class EcoCommand(
     private val accountManager: AccountManager
-) : CommandExecutor {
+) : CommandExecutor, TabCompleter {
 
     override fun onCommand(
         sender: CommandSender,
@@ -48,4 +49,33 @@ class EcoCommand(
         sender.sendMessage("§a${player.name ?: args[1]}님에게 ${Money(amount)} 지급 완료.")
         return true
     }
+
+    override fun onTabComplete(
+        sender: CommandSender,
+        command: Command,
+        alias: String,
+        args: Array<out String>
+    ): List<String> =
+        when (args.size) {
+            1 -> listOf("give")
+                .filter { it.startsWith(args[0], ignoreCase = true) }
+
+            2 -> Bukkit.getOnlinePlayers()
+                .asSequence()
+                .map { it.name }
+                .plus(
+                    Bukkit.getOfflinePlayers()
+                        .asSequence()
+                        .mapNotNull { it.name }
+                )
+                .distinct()
+                .filter { it.startsWith(args[1], ignoreCase = true) }
+                .sortedWith(String.CASE_INSENSITIVE_ORDER)
+                .toList()
+
+            3 -> listOf("100", "1000", "10000")
+                .filter { it.startsWith(args[2]) }
+
+            else -> emptyList()
+        }
 }

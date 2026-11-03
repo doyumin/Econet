@@ -4,7 +4,11 @@ import java.util.UUID
 
 class AccountManager(
     initialAccounts: List<Account> = emptyList(),
-    private val onAccountChanged: (Account) -> Unit = {}
+    private val onAccountChanged: (Account) -> Unit = {},
+    private val onAccountsChanged: (List<Account>) -> Unit = { accounts ->
+        accounts.forEach(onAccountChanged)
+    },
+    private val onAccountCreated: (Account) -> Unit = {}
 ) {
     private val accounts = mutableMapOf<UUID, Account>()
     private val ownerIndex = mutableMapOf<UUID, UUID>()
@@ -30,6 +34,13 @@ class AccountManager(
         ).also {
             accounts[it.id] = it
             ownerIndex[ownerId] = it.id
+            try {
+                onAccountCreated(it)
+            } catch (e: Exception) {
+                accounts.remove(it.id)
+                ownerIndex.remove(ownerId)
+                throw e
+            }
         }
 
     fun getAllAccounts(): List<Account> =
@@ -59,6 +70,32 @@ class AccountManager(
             onAccountChanged(account)
         } catch (e: Exception) {
             account.restoreBalance(previousBalance)
+            throw e
+        }
+
+        return true
+    }
+
+    fun transfer(from: Account, to: Account, amount: Money): Boolean {
+        require(from.id != to.id) {
+            "같은 계좌로 이체할 수 없습니다."
+        }
+        require(amount > Money.ZERO) {
+            "이체액은 양수여야 함"
+        }
+        if (!from.canWithdraw(amount)) return false
+
+        val previousFromBalance = from.balance
+        val previousToBalance = to.balance
+
+        from.withdraw(amount)
+        to.deposit(amount)
+
+        try {
+            onAccountsChanged(listOf(from, to))
+        } catch (e: Exception) {
+            from.restoreBalance(previousFromBalance)
+            to.restoreBalance(previousToBalance)
             throw e
         }
 

@@ -50,21 +50,7 @@ class SQLiteAccountStore(file: File) {
         }
 
     fun save(account: Account) {
-        DriverManager.getConnection(url).use { connection ->
-            connection.prepareStatement(
-                """
-            INSERT INTO accounts (id, owner_id, balance)
-            VALUES (?, ?, ?)
-            ON CONFLICT(id) DO UPDATE SET
-                balance = excluded.balance
-            """.trimIndent()
-            ).use { statement ->
-                statement.setString(1, account.id.toString())
-                statement.setString(2, account.ownerId.toString())
-                statement.setLong(3, account.balance.amount)
-                statement.executeUpdate()
-            }
-        }
+        save(listOf(account))
     }
 
     fun save(accounts: List<Account>) {
