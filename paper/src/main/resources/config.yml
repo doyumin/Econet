@@ -12,6 +12,12 @@ integrity:
   # 장부 무결성 검사 주기(시간). 서버 시작 시에는 항상 한 번 검사한다.
   check-interval-hours: 24
 
+backup:
+  # 플레이어 데이터와 econet.db를 같은 시점으로 함께 백업하는 주기(시간). /econet backup 으로 즉시 실행할 수도 있다.
+  interval-hours: 6
+  # 남길 백업 개수. 오래된 것부터 지운다. 6시간 × 28 = 일주일.
+  keep: 28
+
 buyback:
   # 동적 가격: 서버 전체 판매량이 쌓일수록 품목별 가격이 직선으로 내려가 바닥에서 멈추고,
   # 판매가 없으면 바닥에서 기준가까지 recovery-hours에 걸쳐 직선으로 회복한다.

@@ -5,6 +5,11 @@ import dev.doyu.econet.paper.buyback.MarketStateFile
 import dev.doyu.econet.paper.buyback.SellBoxes
 import dev.doyu.econet.paper.buyback.SellCommand
 import dev.doyu.econet.core.Amount
+import dev.doyu.econet.paper.admin.CoinCensus
+import dev.doyu.econet.paper.admin.InventoryInspector
+import dev.doyu.econet.paper.admin.OfflinePlayerItems
+import dev.doyu.econet.paper.admin.ReadOnlyGuard
+import dev.doyu.econet.paper.admin.SnapshotBackup
 import dev.doyu.econet.paper.bounty.BountyOffice
 import dev.doyu.econet.paper.cash.CashDesk
 import dev.doyu.econet.paper.cash.CoinGuard
@@ -45,6 +50,7 @@ import org.bukkit.NamespacedKey
 import org.bukkit.Registry
 import org.bukkit.plugin.java.JavaPlugin
 import java.time.Clock
+import java.time.Duration
 import java.util.logging.Level
 
 class EconetPlugin : JavaPlugin() {
@@ -84,7 +90,14 @@ class EconetPlugin : JavaPlugin() {
         val policies = InsurancePolicies(dataFolder.resolve("insurance.yml"))
         val shop = GovernmentShop(ledger, shopItems(settings.shopPrices), money, server, logger)
 
+        val offlineItems = OfflinePlayerItems(server, logger)
+        val inspector = InventoryInspector(server, offlineItems)
+        val census = CoinCensus(server, coins, offlineItems, logger)
+        val backup = SnapshotBackup(server, ledger, offlineItems, dataFolder.resolve("backups"), settings.backupsToKeep, clock)
+        scheduleBackups(backup, settings.backupInterval)
+
         server.pluginManager.registerEvents(LockNotice(ledger), this)
+        server.pluginManager.registerEvents(ReadOnlyGuard(), this)
         server.pluginManager.registerEvents(DeathInsurance(ledger, policies, settings.insurancePremium, coins::isCoin, money, logger), this)
         server.pluginManager.registerEvents(BountyOffice(ledger, settings.bountyRewards, money, scope, ::alertAdmins), this)
         server.pluginManager.registerEvents(shop, this)
@@ -101,7 +114,7 @@ class EconetPlugin : JavaPlugin() {
             commands.register("change", "동전을 쪼개거나 합칩니다.", listOf("잔돈"), ChangeCommand(cashDesk))
             commands.register("insurance", "사망 보험에 가입하거나 해지합니다.", listOf("보험"), InsuranceCommand(policies, settings.insurancePremium, money))
             commands.register("shop", "정부 상점을 엽니다.", listOf("상점"), ShopCommand(shop))
-            commands.register("econet", "장부를 점검합니다.", listOf("경제"), EconetCommand(ledger, integrity, cashDesk, money, scope, server, logger))
+            commands.register("econet", "장부를 점검합니다.", listOf("경제"), EconetCommand(ledger, integrity, cashDesk, inspector, census, backup, money, scope, server, logger))
         }
     }
 
@@ -133,6 +146,18 @@ class EconetPlugin : JavaPlugin() {
         }
     }
 
+    /** 백업은 메인 스레드에서 해야 같은 시점이 보장되므로 메인 스레드 타이머로 돌린다. */
+    private fun scheduleBackups(backup: SnapshotBackup, interval: Duration) {
+        val ticks = interval.toSeconds() * TICKS_PER_SECOND
+        server.scheduler.runTaskTimer(this, { _ ->
+            try {
+                logger.info("Backup written to ${backup.run()}")
+            } catch (e: Exception) {
+                logger.log(Level.SEVERE, "Scheduled backup failed", e)
+            }
+        }, ticks, ticks)
+    }
+
     private fun warnAboutUnknownBountyTargets(targets: Set<String>) {
         for (target in targets - RAID_CAPTAIN) {
             val key = NamespacedKey.fromString(target)
@@ -153,6 +178,7 @@ class EconetPlugin : JavaPlugin() {
 
     private companion object {
         const val MAX_SHOP_ITEMS = 54
+        const val TICKS_PER_SECOND = 20L
         const val SHUTDOWN_GRACE_MILLIS = 5_000L
     }
 }
