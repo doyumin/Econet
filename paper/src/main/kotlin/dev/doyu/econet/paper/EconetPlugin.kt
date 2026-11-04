@@ -22,7 +22,6 @@ import dev.doyu.econet.paper.command.BalanceCommand
 import dev.doyu.econet.paper.command.EconetCommand
 import dev.doyu.econet.paper.command.MintCommand
 import dev.doyu.econet.paper.command.PayCommand
-import dev.doyu.econet.paper.config.RAID_CAPTAIN
 import dev.doyu.econet.paper.config.readSettings
 import dev.doyu.econet.paper.format.MoneyFormat
 import dev.doyu.econet.paper.insurance.DeathInsurance
@@ -159,7 +158,7 @@ class EconetPlugin : JavaPlugin() {
     }
 
     private fun warnAboutUnknownBountyTargets(targets: Set<String>) {
-        for (target in targets - RAID_CAPTAIN) {
+        for (target in targets) {
             val key = NamespacedKey.fromString(target)
             if (key == null || Registry.ENTITY_TYPE.get(key) == null) logger.warning("bounty.rewards.$target is not a known entity")
         }
