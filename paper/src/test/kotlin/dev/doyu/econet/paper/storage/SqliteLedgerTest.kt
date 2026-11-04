@@ -158,6 +158,21 @@ class SqliteLedgerTest {
     }
 
     @Test
+    fun `a backup is a complete ledger that passes the integrity check`() = runBlocking<Unit> {
+        val ledger = open()
+        ledger.fund(alice, 100)
+        val backupFile = directory.resolve("backup.db")
+
+        ledger.backupTo(backupFile)
+        ledger.transfer(alice, bob, Amount(1), TxKind.Transfer, admin)
+
+        val backup = SqliteLedger(backupFile, clock).also { opened += it }
+        assertEquals(Balance(100), backup.balanceOf(alice))
+        assertEquals(2, backup.allTransactions().size)
+        assertTrue(backup.checkIntegrity().isIntact)
+    }
+
+    @Test
     fun `concurrent transfers preserve the total`() = runBlocking<Unit> {
         val ledger = open()
         val players = List(10) { AccountId.Player(UUID.randomUUID()) }

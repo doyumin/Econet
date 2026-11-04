@@ -9,6 +9,8 @@ import java.time.Duration
 data class EconetSettings(
     val currency: CurrencySettings,
     val integrityCheckInterval: Duration,
+    val backupInterval: Duration,
+    val backupsToKeep: Int,
     val buyback: BuybackSettings,
     val insurancePremium: Amount,
     /** 키는 엔티티 ID 또는 [RAID_CAPTAIN]. */
@@ -49,6 +51,8 @@ fun readSettings(config: ConfigurationSection): EconetSettings {
             format = config.requireString("currency.format"),
         ),
         integrityCheckInterval = Duration.ofHours(config.requirePositiveLong("integrity.check-interval-hours")),
+        backupInterval = Duration.ofHours(config.requirePositiveLong("backup.interval-hours")),
+        backupsToKeep = config.requirePositiveLong("backup.keep").toInt(),
         insurancePremium = Amount(config.requirePositiveLong("insurance.premium")),
         bountyRewards = config.readAmounts("bounty.rewards"),
         shopPrices = config.readAmounts("shop.items"),

@@ -117,7 +117,7 @@ interface Ledger {
   - 이유: 실제 서버 없이 검증할 수 있는 범위를 최대로 넓히기 위해.
 - 명령어는 Paper Brigadier lifecycle(`LifecycleEvents.COMMANDS`)에 `BasicCommand`로 등록한다. 영어 이름 + 한글 별칭.
   - Paper 26.3에서 한글 별칭이 등록·실행되는 것을 실제 서버 콘솔로 확인했다.
-- 장부 호출은 플러그인 `CoroutineScope`(Dispatchers.Default)에서 한다. 메인 스레드에서 `runBlocking`으로 장부를 기다리지 않는다. 예외는 둘: 서버 시작 시 무결성 검사, 그리고 **아이템과 돈이 함께 움직이는 처리**(판매 상자 정산, 인출·입금).
+- 장부 호출은 플러그인 `CoroutineScope`(Dispatchers.Default)에서 한다. 메인 스레드에서 `runBlocking`으로 장부를 기다리지 않는다. 예외는 셋: 서버 시작 시 무결성 검사, **아이템과 돈이 함께 움직이는 처리**(판매 상자 정산, 인출·입금, 상점 구매, 사망 보험), 그리고 **백업**(같은 시점 보장).
   - 이유: 메인 스레드가 멈추면 서버 전체가 멈춘다.
 - 월드·인벤토리·접속자 목록은 메인 스레드에서만 만진다(`MainThreadDispatcher`).
 - `onDisable`은 메인 스레드에서 남은 작업을 잠깐 기다린다. 그러니 종료 직전에 끝나야 하는 작업이 메인 스레드를 기다리게(`withContext(mainThread)`) 만들지 않는다. 알림처럼 결과를 기다릴 필요 없는 일은 `runTask`로 넘기기만 한다.
@@ -202,3 +202,16 @@ JDK 25 툴체인이 필요하다.
 - 설정의 아이템·엔티티 ID는 시작 시 Registry로 검사해 경고한다.
   - 이유: 오타는 조용히 "매입 안 함·지급 안 함"이 되기 때문이다.
 - 인벤토리 공간 확인은 `fitsInInventory`(복사본에 넣어 보기), 지급은 `receive`(넘치면 발밑)로 통일한다.
+
+## 관리자 도구 (6단계)
+
+- `/econet inv|ender <플레이어>`: 접속 중이면 실제 인벤토리·엔더상자를 연다(실시간, 수정 가능). 오프라인이면 저장 파일의 사본을 **읽기 전용**(`ReadOnlyView`, 모든 클릭·드래그 취소)으로 연다.
+  - 이유: 오프라인 파일을 고치면 접속 시 서버가 덮어써 수정이 사라지거나 아이템이 복제된다.
+- 오프라인 파일: Paper 26.3은 `<월드 루트>/players/data/<uuid>.dat`(DESIGN의 `playerdata/`는 옛 위치라 대체 경로로만 본다). 키는 `Inventory`·`EnderItems`(원소에 `Slot`), `equipment`(head/chest/legs/feet/offhand/body/saddle), 루트 `DataVersion`.
+- 26.3의 `World.getWorldFolder()`는 차원 폴더(`world/dimensions/minecraft/overworld`)를 돌려준다. 월드 루트는 `level.dat`가 있는 폴더까지 올라가 찾는다. 실제 서버에서 발견했다.
+- NBT는 서버 내부 클래스(NMS) 없이 직접 읽는다(`Nbt.kt`). 아이템 변환만 `ItemStack.deserializeBytes`에 맡긴다: 아이템 compound에서 `Slot`을 빼고 `DataVersion`을 붙여 gzip.
+  - 이유: NMS는 버전마다 깨진다. Paper가 DataVersion을 보고 옛 아이템도 현재 형식으로 변환해 준다. 실제 서버에서 인챈트·이름·동전·셜커·꾸러미가 원본과 같게 돌아오는 것을 확인했다.
+- 동전 집계(`/econet census`): 접속자는 실제 인벤토리, 오프라인은 파일을 읽어 인벤토리·엔더상자·장비 안의 동전을 센다. 셜커 상자·꾸러미 안까지(깊이 4) 센다. 총액과 CashPool의 차이만 보여 주고, 개인별 보유량은 보여 주지 않는다.
+  - 이유: 월드 상자는 세지 않으므로 참고용이고(DESIGN 9장), 현금의 익명성(DESIGN 6장)을 평상시에 해치지 않기 위해서다. 차이가 음수면 장부보다 동전이 많다는 뜻(복사 의심)이다.
+- 백업(`/econet backup`, 설정 주기): 메인 스레드에서 `savePlayers()` → `SqliteLedger.backupTo`(VACUUM INTO, 쓰기 스레드) → 플레이어 파일 복사를 한 번에 한다. `backups/<UTC 시각>/`에 `econet.db`와 `playerdata/`가 같이 들어간다. 오래된 것부터 지워 `backup.keep`개를 남긴다.
+  - 이유: 둘을 따로 복구하면 장부와 동전이 어긋난다. 메인 스레드가 멈춰 있는 동안에는 아이템과 돈을 함께 옮기는 처리가 끼어들 수 없다. DB 파일을 그냥 복사하면 WAL에 남은 최근 거래가 빠질 수 있다.

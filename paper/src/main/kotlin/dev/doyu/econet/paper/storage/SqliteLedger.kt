@@ -177,6 +177,18 @@ class SqliteLedger(file: Path, private val clock: Clock) : Ledger, AutoCloseable
         report
     }
 
+    /**
+     * 장부 전체를 [target] 파일로 복사한다. 쓰기 스레드 위에서 돌기 때문에 거래 도중의 반쪽 상태가 담기지 않는다.
+     * 파일을 그냥 복사하면 WAL에 남은 최근 거래가 빠질 수 있어서 SQLite의 VACUUM INTO를 쓴다.
+     */
+    suspend fun backupTo(target: Path) = withContext(writer) {
+        require(!target.toFile().exists()) { "backup target already exists: $target" }
+        connection.prepareStatement("VACUUM INTO ?").use { statement ->
+            statement.setString(1, target.toString())
+            statement.execute()
+        }
+    }
+
     override fun close() {
         writerThread.submit { connection.close() }.get()
         writerThread.shutdown()
