@@ -19,14 +19,16 @@ class EconetSettingsTest {
 
         assertEquals(CurrencySettings("듄", "DYN", "{amount}{name}"), settings.currency)
         assertEquals(Duration.ofHours(24), settings.integrityCheckInterval)
-        assertEquals(BigDecimal("0.1"), settings.buybackPrices["minecraft:wheat"])
-        assertEquals(BigDecimal("30"), settings.buybackPrices["minecraft:ancient_debris"])
-        assertEquals(19, settings.buybackPrices.size)
+        assertEquals(BigDecimal("0.1"), settings.buyback.prices["minecraft:wheat"])
+        assertEquals(BigDecimal("30"), settings.buyback.prices["minecraft:ancient_debris"])
+        assertEquals(19, settings.buyback.prices.size)
+        assertEquals(0, BigDecimal("0.2").compareTo(settings.buyback.pricing.floorRatio))
+        assertEquals(Duration.ofHours(24), settings.buyback.pricing.recoveryTime)
     }
 
     @Test
     fun `excluded items are not in the price table`() {
-        val prices = readSettings(bundledConfig()).buybackPrices
+        val prices = readSettings(bundledConfig()).buyback.prices
 
         for (excluded in listOf("minecraft:emerald", "minecraft:iron_ingot", "minecraft:gold_nugget", "minecraft:sugar_cane", "minecraft:iron_block")) {
             assertEquals(null, prices[excluded], excluded)
