@@ -111,6 +111,23 @@ interface Ledger {
 범용 `verifyIntegrity`는 잔액과 장부를 따로 읽으므로 송금이 없을 때 호출한다. `SqliteLedger.checkIntegrity`는 한 시점으로 묶어 검사하므로 언제든 쓸 수 있다.
 - 이유: 저장된 잔액은 캐시이고 진실은 거래 기록이다. 검사 도중 송금이 끼어들면 두 값이 서로 다른 시점을 가리킨다.
 
+## paper 레이어 규칙
+
+- 로직은 Bukkit과 분리해 단위 테스트하고, Paper 연결부(명령어·리스너)는 얇게 유지한다.
+  - 이유: 실제 서버 없이 검증할 수 있는 범위를 최대로 넓히기 위해.
+- 명령어는 Paper Brigadier lifecycle(`LifecycleEvents.COMMANDS`)에 `BasicCommand`로 등록한다. 영어 이름 + 한글 별칭.
+  - Paper 26.3에서 한글 별칭이 등록·실행되는 것을 실제 서버 콘솔로 확인했다.
+- 장부 호출은 플러그인 `CoroutineScope`(Dispatchers.Default)에서 한다. 메인 스레드에서 `runBlocking`으로 장부를 기다리지 않는다. 예외는 서버 시작 시 무결성 검사 한 번.
+  - 이유: 메인 스레드가 멈추면 서버 전체가 멈춘다.
+- 월드·인벤토리·접속자 목록은 메인 스레드에서만 만진다(`MainThreadDispatcher`).
+- `onDisable`은 메인 스레드에서 남은 작업을 잠깐 기다린다. 그러니 종료 직전에 끝나야 하는 작업이 메인 스레드를 기다리게(`withContext(mainThread)`) 만들지 않는다. 알림처럼 결과를 기다릴 필요 없는 일은 `runTask`로 넘기기만 한다.
+  - 이유: 서로 기다리는 교착으로 그 작업이 취소된다. 실제 서버에서 겪었다.
+- 금액 표시는 `MoneyFormat.display`(플레이어 화면, `12,500듄`), 로그·관리자 출력은 `MoneyFormat.plain`(`12500 DYN`).
+- 이름으로 플레이어를 찾을 때는 `findKnownPlayer`만 쓴다. 접속한 적 없는 이름은 거절한다.
+  - 이유: `getOfflinePlayer(name)`는 모르는 이름에도 가짜 UUID를 만들어, 오타 낸 송금이 주인 없는 계좌로 간다.
+- 실패 메시지는 `failureMessage` 한 곳의 `when`을 거친다.
+- 설정 값이 빠졌거나 틀리면 기본값으로 덮지 않고 시작 시 실패한다.
+
 ## 코드 스타일: 잘 읽히는 클린 코드
 
 - 구현이 하나뿐이면 인터페이스를 만들지 않는다. (Ledger는 예외)

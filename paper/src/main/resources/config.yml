@@ -1,0 +1,39 @@
+# Econet 설정. 바꾼 뒤에는 서버를 재시작해야 반영된다.
+
+currency:
+  # 화면에 보이는 화폐 이름
+  name: "듄"
+  # 로그·명령어 출력에 쓰는 코드. 장부와 무관하므로 바꿔도 잔액에는 영향이 없다.
+  code: "DYN"
+  # 화면 표시 형식. {amount}는 천 단위 쉼표가 붙은 금액, {name}은 이름, {code}는 코드
+  format: "{amount}{name}"
+
+integrity:
+  # 장부 무결성 검사 주기(시간). 서버 시작 시에는 항상 한 번 검사한다.
+  check-interval-hours: 24
+
+# 정부 매입 기준가(듄). 키는 아이템 ID. 여기 없는 아이템은 매입하지 않는다.
+# 제외 품목(에메랄드, 주괴·조각·블록, 사탕수수 등 자동 농장 산출물, 금화)은 일부러 넣지 않았다.
+buyback:
+  prices:
+    # 광물: 원석은 광석 채굴로만 나오므로 직접 캤다는 증거가 된다.
+    minecraft:coal: 0.5
+    minecraft:raw_copper: 0.5
+    minecraft:lapis_lazuli: 0.5
+    minecraft:quartz: 0.5
+    minecraft:redstone: 0.3
+    minecraft:raw_iron: 2
+    minecraft:raw_gold: 5
+    minecraft:diamond: 10
+    minecraft:ancient_debris: 30
+    # 몹 드롭과 작물: 서버 오픈 후 약 일주일간 장부를 보고 조정한다.
+    minecraft:bone: 0.2
+    minecraft:string: 0.2
+    minecraft:gunpowder: 0.2
+    minecraft:rotten_flesh: 0.2
+    minecraft:ender_pearl: 1
+    minecraft:blaze_rod: 1.5
+    minecraft:wheat: 0.1
+    minecraft:potato: 0.1
+    minecraft:carrot: 0.1
+    minecraft:beetroot: 0.1
