@@ -4,6 +4,8 @@ import dev.doyu.econet.paper.buyback.BuybackMarket
 import dev.doyu.econet.paper.buyback.MarketStateFile
 import dev.doyu.econet.paper.buyback.SellBoxes
 import dev.doyu.econet.paper.buyback.SellCommand
+import dev.doyu.econet.core.Amount
+import dev.doyu.econet.paper.bounty.BountyOffice
 import dev.doyu.econet.paper.cash.CashDesk
 import dev.doyu.econet.paper.cash.CoinGuard
 import dev.doyu.econet.paper.cash.CoinItems
@@ -15,10 +17,17 @@ import dev.doyu.econet.paper.command.BalanceCommand
 import dev.doyu.econet.paper.command.EconetCommand
 import dev.doyu.econet.paper.command.MintCommand
 import dev.doyu.econet.paper.command.PayCommand
+import dev.doyu.econet.paper.config.RAID_CAPTAIN
 import dev.doyu.econet.paper.config.readSettings
 import dev.doyu.econet.paper.format.MoneyFormat
+import dev.doyu.econet.paper.insurance.DeathInsurance
+import dev.doyu.econet.paper.insurance.InsuranceCommand
+import dev.doyu.econet.paper.insurance.InsurancePolicies
 import dev.doyu.econet.paper.integrity.IntegrityWatch
 import dev.doyu.econet.paper.integrity.LockNotice
+import dev.doyu.econet.paper.shop.GovernmentShop
+import dev.doyu.econet.paper.shop.ShopCommand
+import dev.doyu.econet.paper.shop.ShopItem
 import dev.doyu.econet.paper.storage.SqliteLedger
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -31,6 +40,7 @@ import kotlinx.coroutines.job
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
+import org.bukkit.Material
 import org.bukkit.NamespacedKey
 import org.bukkit.Registry
 import org.bukkit.plugin.java.JavaPlugin
@@ -65,12 +75,19 @@ class EconetPlugin : JavaPlugin() {
 
         val market = BuybackMarket(settings.buyback.prices, settings.buyback.pricing, marketState.load())
         warnAboutUnknownItems(settings.buyback.prices.keys)
+        warnAboutUnknownBountyTargets(settings.bountyRewards.keys)
         val coins = CoinItems(this, money)
         val cashDesk = CashDesk(ledger, coins, money, server, logger, ::alertAdmins)
         val sellBoxes = SellBoxes(this, ledger, market, marketState, money, clock, ::alertAdmins, coins::isCoin)
         this.sellBoxes = sellBoxes
 
+        val policies = InsurancePolicies(dataFolder.resolve("insurance.yml"))
+        val shop = GovernmentShop(ledger, shopItems(settings.shopPrices), money, server, logger)
+
         server.pluginManager.registerEvents(LockNotice(ledger), this)
+        server.pluginManager.registerEvents(DeathInsurance(ledger, policies, settings.insurancePremium, coins::isCoin, money, logger), this)
+        server.pluginManager.registerEvents(BountyOffice(ledger, settings.bountyRewards, money, scope, ::alertAdmins), this)
+        server.pluginManager.registerEvents(shop, this)
         server.pluginManager.registerEvents(sellBoxes, this)
         server.pluginManager.registerEvents(CoinGuard(coins), this)
         lifecycleManager.registerEventHandler(LifecycleEvents.COMMANDS) { event ->
@@ -82,6 +99,8 @@ class EconetPlugin : JavaPlugin() {
             commands.register("withdraw", "예금을 동전으로 인출합니다.", listOf("인출"), WithdrawCommand(cashDesk))
             commands.register("deposit", "인벤토리의 동전을 모두 예금합니다.", listOf("입금"), DepositCommand(cashDesk))
             commands.register("change", "동전을 쪼개거나 합칩니다.", listOf("잔돈"), ChangeCommand(cashDesk))
+            commands.register("insurance", "사망 보험에 가입하거나 해지합니다.", listOf("보험"), InsuranceCommand(policies, settings.insurancePremium, money))
+            commands.register("shop", "정부 상점을 엽니다.", listOf("상점"), ShopCommand(shop))
             commands.register("econet", "장부를 점검합니다.", listOf("경제"), EconetCommand(ledger, integrity, cashDesk, money, scope, server, logger))
         }
     }
@@ -114,7 +133,26 @@ class EconetPlugin : JavaPlugin() {
         }
     }
 
+    private fun warnAboutUnknownBountyTargets(targets: Set<String>) {
+        for (target in targets - RAID_CAPTAIN) {
+            val key = NamespacedKey.fromString(target)
+            if (key == null || Registry.ENTITY_TYPE.get(key) == null) logger.warning("bounty.rewards.$target is not a known entity")
+        }
+    }
+
+    /** 상점 품목은 아이템 종류로 바꿀 수 있어야 진열할 수 있다. 오타 난 품목은 경고하고 뺀다. */
+    private fun shopItems(prices: Map<String, Amount>): List<ShopItem> {
+        val items = prices.mapNotNull { (key, price) ->
+            val material = Material.matchMaterial(key)?.takeIf { it.isItem }
+            if (material == null) logger.warning("shop.items.$key is not a known item")
+            material?.let { ShopItem(it, price) }
+        }
+        if (items.size > MAX_SHOP_ITEMS) logger.warning("Only the first $MAX_SHOP_ITEMS shop items are shown")
+        return items.take(MAX_SHOP_ITEMS)
+    }
+
     private companion object {
+        const val MAX_SHOP_ITEMS = 54
         const val SHUTDOWN_GRACE_MILLIS = 5_000L
     }
 }

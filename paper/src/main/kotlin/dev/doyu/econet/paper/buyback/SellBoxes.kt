@@ -7,6 +7,7 @@ import dev.doyu.econet.core.TransferResult
 import dev.doyu.econet.core.TxKind
 import dev.doyu.econet.paper.command.failureMessage
 import dev.doyu.econet.paper.format.MoneyFormat
+import dev.doyu.econet.paper.receive
 import kotlinx.coroutines.runBlocking
 import org.bukkit.NamespacedKey
 import org.bukkit.entity.Player
@@ -144,9 +145,11 @@ class SellBoxes(
      * 접속 종료로 닫힐 때는 플레이어 저장보다 먼저 일어나므로 인벤토리에 넣으면 저장된다(Paper 26.3 PlayerList.remove 순서 확인).
      */
     private fun giveBack(player: Player, items: List<ItemStack>, reason: InventoryCloseEvent.Reason) {
-        if (items.isEmpty()) return
-        val leftovers = if (reason == InventoryCloseEvent.Reason.DEATH) items else player.inventory.addItem(*items.toTypedArray()).values
-        for (item in leftovers) player.world.dropItemNaturally(player.location, item)
+        if (reason == InventoryCloseEvent.Reason.DEATH) {
+            for (item in items) player.world.dropItemNaturally(player.location, item)
+        } else {
+            player.receive(items)
+        }
     }
 
     private fun saveMarketState() {

@@ -1,5 +1,6 @@
 package dev.doyu.econet.paper.config
 
+import dev.doyu.econet.core.Amount
 import dev.doyu.econet.paper.buyback.DynamicPricing
 import org.bukkit.configuration.ConfigurationSection
 import java.math.BigDecimal
@@ -9,7 +10,14 @@ data class EconetSettings(
     val currency: CurrencySettings,
     val integrityCheckInterval: Duration,
     val buyback: BuybackSettings,
+    val insurancePremium: Amount,
+    /** 키는 엔티티 ID 또는 [RAID_CAPTAIN]. */
+    val bountyRewards: Map<String, Amount>,
+    /** 등록 순서대로 상점에 진열한다. */
+    val shopPrices: Map<String, Amount>,
 )
+
+const val RAID_CAPTAIN = "raid-captain"
 
 data class BuybackSettings(
     val prices: Map<String, BigDecimal>,
@@ -41,6 +49,9 @@ fun readSettings(config: ConfigurationSection): EconetSettings {
             format = config.requireString("currency.format"),
         ),
         integrityCheckInterval = Duration.ofHours(config.requirePositiveLong("integrity.check-interval-hours")),
+        insurancePremium = Amount(config.requirePositiveLong("insurance.premium")),
+        bountyRewards = config.readAmounts("bounty.rewards"),
+        shopPrices = config.readAmounts("shop.items"),
         buyback = BuybackSettings(
             prices = buybackPrices,
             pricing = DynamicPricing(
@@ -54,6 +65,16 @@ fun readSettings(config: ConfigurationSection): EconetSettings {
 
 private fun ConfigurationSection.requireString(path: String): String =
     requireNotNull(getString(path)?.takeIf { it.isNotBlank() }) { "$path is missing" }
+
+private fun ConfigurationSection.readAmounts(path: String): Map<String, Amount> {
+    val section = getConfigurationSection(path) ?: return emptyMap()
+    return section.getKeys(false).associateWith { key ->
+        require(section.isLong(key) || section.isInt(key)) { "$path.$key must be a whole number" }
+        val value = section.getLong(key)
+        require(value > 0) { "$path.$key must be positive" }
+        Amount(value)
+    }
+}
 
 private fun ConfigurationSection.requireDecimal(path: String): BigDecimal =
     requireNotNull(getString(path)?.toBigDecimalOrNull()) { "$path must be a number" }

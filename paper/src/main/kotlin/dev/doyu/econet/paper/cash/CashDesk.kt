@@ -7,7 +7,9 @@ import dev.doyu.econet.core.Ledger
 import dev.doyu.econet.core.TransferResult
 import dev.doyu.econet.core.TxKind
 import dev.doyu.econet.paper.command.failureMessage
+import dev.doyu.econet.paper.fitsInInventory
 import dev.doyu.econet.paper.format.MoneyFormat
+import dev.doyu.econet.paper.receive
 import kotlinx.coroutines.runBlocking
 import org.bukkit.Server
 import org.bukkit.entity.Player
@@ -38,7 +40,7 @@ class CashDesk(
             return
         }
         val items = coins.create(breakdown)
-        if (!fits(player, items)) {
+        if (!server.fitsInInventory(player, items)) {
             player.sendMessage("인벤토리에 동전을 받을 공간이 부족합니다.")
             return
         }
@@ -52,7 +54,7 @@ class CashDesk(
         }
         when (result) {
             is TransferResult.Success -> {
-                give(player, items)
+                player.receive(items)
                 player.sendMessage("${money.display(amount)}을 현금으로 인출했습니다.")
             }
             is TransferResult.Failure -> player.sendMessage(failureMessage(result, money))
@@ -89,7 +91,7 @@ class CashDesk(
             logger.log(Level.SEVERE, "Deposit failed for ${player.name}; coins were returned", e)
             player.sendMessage("오류로 예금하지 못했습니다. 동전을 돌려드렸습니다.")
         } finally {
-            if (!deposited) give(player, taken)
+            if (!deposited) player.receive(taken)
         }
     }
 
@@ -109,12 +111,12 @@ class CashDesk(
         val before = held.clone()
         player.inventory.setItemInMainHand(if (held.amount > 1) held.clone().apply { amount -= 1 } else null)
         val change = coins.create(mapOf(smaller to denomination.value / smaller.value))
-        if (!fits(player, change)) {
+        if (!server.fitsInInventory(player, change)) {
             player.inventory.setItemInMainHand(before)
             player.sendMessage("인벤토리에 잔돈을 받을 공간이 부족합니다.")
             return
         }
-        give(player, change)
+        player.receive(change)
         player.sendMessage("${denomination.displayName} 1개를 ${smaller.displayName} ${change.sumOf { it.amount }}개로 바꿨습니다.")
     }
 
@@ -129,15 +131,15 @@ class CashDesk(
         try {
             val total = totalValue(coins.count(taken))
             val regrouped = coins.create(breakDown(total))
-            if (fits(player, regrouped)) {
-                give(player, regrouped)
+            if (server.fitsInInventory(player, regrouped)) {
+                player.receive(regrouped)
                 merged = true
                 player.sendMessage("동전 ${money.display(total)}을 다시 묶었습니다.")
             } else {
                 player.sendMessage("인벤토리에 공간이 부족합니다.")
             }
         } finally {
-            if (!merged) give(player, taken)
+            if (!merged) player.receive(taken)
         }
     }
 
@@ -152,19 +154,6 @@ class CashDesk(
             }
         }
         return taken
-    }
-
-    /** 실제 인벤토리를 건드리지 않고, 복사본에 넣어 보아 다 들어가는지 확인한다. */
-    private fun fits(player: Player, items: List<ItemStack>): Boolean {
-        val probe = server.createInventory(null, PLAYER_STORAGE_SIZE)
-        probe.storageContents = player.inventory.storageContents.map { it?.clone() }.toTypedArray()
-        return probe.addItem(*items.map { it.clone() }.toTypedArray()).isEmpty()
-    }
-
-    private fun give(player: Player, items: List<ItemStack>) {
-        if (items.isEmpty()) return
-        val leftovers = player.inventory.addItem(*items.toTypedArray()).values
-        for (item in leftovers) player.world.dropItemNaturally(player.location, item)
     }
 
     private companion object {

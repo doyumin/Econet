@@ -47,3 +47,32 @@ buyback:
     minecraft:potato: 0.1
     minecraft:carrot: 0.1
     minecraft:beetroot: 0.1
+
+insurance:
+  # 사망 보험료(듄). 가입자가 죽으면 예금에서 정부로 빠지고 인벤토리를 지킨다. 동전은 보험이 있어도 떨군다.
+  # 임시값: 서버 운영 후 장부를 보고 정한다.
+  premium: 100
+
+bounty:
+  # 보스급 몹 현상금(듄). 정부 금고에서 처치한 플레이어에게 지급한다. 일반 몹에는 현상금이 없다.
+  # 키는 엔티티 ID. 습격 대장(깃발을 든 약탈자 무리 대장)은 raid-captain. 임시값.
+  rewards:
+    minecraft:wither: 500
+    minecraft:elder_guardian: 200
+    minecraft:ender_dragon: 1000
+    raid-captain: 50
+
+shop:
+  # 정부 상점 품목과 한 개 가격(듄). 임시값: 서버 운영 후 정한다. 최대 54종.
+  items:
+    minecraft:name_tag: 50
+    minecraft:saddle: 80
+    minecraft:experience_bottle: 5
+    minecraft:clay: 2
+    minecraft:sandstone: 1
+    minecraft:red_sandstone: 1
+    minecraft:brain_coral_block: 5
+    minecraft:tube_coral_block: 5
+    minecraft:bubble_coral_block: 5
+    minecraft:fire_coral_block: 5
+    minecraft:horn_coral_block: 5

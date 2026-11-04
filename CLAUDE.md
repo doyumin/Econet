@@ -189,3 +189,16 @@ interface Ledger {
 ```
 
 JDK 25 툴체인이 필요하다.
+
+## 보험·현상금·상점 (5단계)
+
+- 사망 보험: 가입자가 죽으면 보험료(Player → Government, `Purchase`, 주체 `System("insurance")`)를 받고 `keepInventory = true`, `drops`를 비운 뒤 동전만 인벤토리에서 빼 `drops`에 넣는다.
+  - 이유: Paper 26.3은 keepInventory와 상관없이 `drops`를 떨군다(CraftEventFactory 확인). 그래서 이 조합이면 "인벤토리는 지키고 동전은 떨군다"가 된다.
+- 보험료를 못 내면(잔액 부족·잠금·오류) 보험이 적용되지 않고 일반 사망 처리된다. 서버가 이미 keepInventory면 보험료를 받지 않는다.
+- 가입 명단은 `insurance.yml`에 둔다. 돈이 아니라 약정이라서다.
+- 현상금: 보스급만(설정 `bounty.rewards`). 처치한 플레이어(`killer`)에게 Government → Player `Reward`. 아이템이 오가지 않으므로 비동기로 처리한다. 습격 대장은 엔티티 종류가 아니라 `Raider.isPatrolLeader`라서 별도 키 `raid-captain`을 쓴다.
+- 정부 상점(틀만): 설정 `shop.items` 순서대로 진열한다. 클릭하면 1개를 산다(Player → Government `Purchase`). 공간을 먼저 확인하고, 돈을 받은 뒤 아이템을 준다. 상점이 열려 있는 동안의 클릭·드래그는 모두 취소한다.
+  - 이유: 진열품은 견본이라 꺼낼 수 없어야 한다. 위쪽만 막으면 shift-클릭·숫자키 같은 경로를 하나씩 따져야 한다.
+- 설정의 아이템·엔티티 ID는 시작 시 Registry로 검사해 경고한다.
+  - 이유: 오타는 조용히 "매입 안 함·지급 안 함"이 되기 때문이다.
+- 인벤토리 공간 확인은 `fitsInInventory`(복사본에 넣어 보기), 지급은 `receive`(넘치면 발밑)로 통일한다.
