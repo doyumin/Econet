@@ -23,7 +23,7 @@ class LedgerInvariantTest {
     private val accounts: List<AccountId> = regularAccounts + listOf(Issuance, CashPool)
 
     @Test
-    fun `thousands of random transfers keep the books balanced`() = runBlocking {
+    fun `thousands of random transfers keep the books balanced`() = runBlocking<Unit> {
         val random = Random(42)
         var successes = 0
 
@@ -45,7 +45,8 @@ class LedgerInvariantTest {
                 is TransferResult.Failure.InsufficientFunds,
                 TransferResult.Failure.SameAccount,
                 TransferResult.Failure.Overflow,
-                TransferResult.Failure.InvalidRoute -> Unit
+                TransferResult.Failure.InvalidRoute,
+                TransferResult.Failure.Locked -> Unit
             }
         }
 
@@ -57,7 +58,7 @@ class LedgerInvariantTest {
     }
 
     @Test
-    fun `concurrent transfers preserve the total`() = runBlocking {
+    fun `concurrent transfers preserve the total`() = runBlocking<Unit> {
         ledger.transfer(Issuance, Government, Amount(1_000_000), TxKind.Mint, system)
         for (player in players) {
             ledger.transfer(Government, player, Amount(10_000), TxKind.Reward, system)
@@ -81,7 +82,7 @@ class LedgerInvariantTest {
     }
 
     @Test
-    fun `tampered balances are reported`() = runBlocking {
+    fun `tampered balances are reported`() = runBlocking<Unit> {
         val tampered = object : Ledger by ledger {
             override suspend fun allBalances() = ledger.allBalances() + (players[0] to Balance(5))
         }

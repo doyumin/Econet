@@ -29,7 +29,7 @@
 | `Actor` | sealed: `Player(uuid)`, `Admin(uuid)`, `System(source)` | 돈이 오간 계좌와 "누가 시켰는지"는 다른 정보다. |
 | `TxKind` | Transfer, Mint, Burn, CashOut, CashIn, Reward, Purchase, Sale, Tax | 거래 분류. 특수 계좌 경로 검사에도 쓴다. |
 | `Transaction` | id(`TransactionId`, Long 순번), from, to, amount, kind, actor, memo, at(Instant) | Long 순번은 재생 순서가 명확하고 SQLite AUTOINCREMENT와 맞는다. |
-| `TransferResult` | `Success(transaction)` / `Failure`: `InsufficientFunds(balance, required)`, `SameAccount`, `Overflow`, `InvalidRoute` | 예상 가능한 실패는 예외가 아니라 값으로 돌려준다. 호출자가 `when`으로 빠짐없이 처리하게 하기 위해. |
+| `TransferResult` | `Success(transaction)` / `Failure`: `InsufficientFunds(balance, required)`, `SameAccount`, `Overflow`, `InvalidRoute`, `Locked` | 예상 가능한 실패는 예외가 아니라 값으로 돌려준다. 호출자가 `when`으로 빠짐없이 처리하게 하기 위해. |
 
 ## 계좌와 경로 규칙
 
@@ -51,7 +51,9 @@
   - 이유: 그래야 두 계좌의 잔액이 각각 "총 통화량", "현금 유통량"이라는 의미를 유지한다.
 - 나머지 종류는 분류용 라벨이다. 방향(예: Tax는 Player → Government)은 paper 레이어가 맞게 호출할 책임이 있다.
   - 이유: 라벨까지 경로를 강제하면 사용처가 늘어날 때마다 core를 고쳐야 한다.
-- 검사 순서: SameAccount → InvalidRoute → InsufficientFunds → Overflow. 실패하면 아무것도 바뀌지 않는다.
+- 검사 순서: (Locked) → SameAccount → InvalidRoute → InsufficientFunds → Overflow. 실패하면 아무것도 바뀌지 않는다.
+- 판정은 `decideTransfer`(core) 한 곳에서 한다. Ledger 구현은 저장만 다르고 판정은 이 함수를 쓴다.
+  - 이유: 구현마다 규칙이나 검사 순서가 어긋나는 것을 막기 위해.
 - 거래한 적 없는 계좌의 잔액은 0이다. 계좌 개설 절차는 없다.
   - 이유: 잔액 0인 계좌와 없는 계좌를 구분할 필요가 없고, 개설 단계가 있으면 그만큼 실패 경로가 늘어난다.
 
@@ -76,7 +78,7 @@ interface Ledger {
 - 인터페이스로 둔다. 저장소(메모리, SQLite 등)를 갈아 끼울 경계이기 때문이다. "구현이 하나면 인터페이스 금지" 규칙의 유일한 예외.
 - `suspend`: 저장소 구현이 I/O를 할 수 있어야 하므로.
 - `allBalances`/`allTransactions`: 무결성 검사가 어떤 구현에서든 동작하게 하기 위해 인터페이스에 둔다.
-- 경로 규칙은 `TxKind.permits`, 음수 허용은 `AccountId.allowsNegativeBalance`에 있다. 새 구현도 이것을 써야 한다.
+- 경로 규칙은 `TxKind.permits`, 음수 허용은 `AccountId.allowsNegativeBalance`에 있고, 둘을 묶은 판정이 `decideTransfer`다. 새 구현도 이것을 써야 한다.
   - 이유: 규칙은 저장소가 아니라 도메인에 속한다.
 
 ### InMemoryLedger
@@ -84,13 +86,29 @@ interface Ledger {
 테스트·개발용 구현. 모든 연산(읽기 포함)을 `Mutex` 하나로 직렬화한다. `Clock`은 생성자로 주입받는다.
 - 이유: 잔액 확인과 갱신 사이에 다른 송금이 끼어들면 잔액 부족 검사가 무의미해진다. Clock 주입은 시간을 테스트에서 고정하기 위해.
 
+### SqliteLedger (paper 모듈, `dev.doyu.econet.paper.storage`)
+
+운영용 구현. DESIGN.md 8장을 따른다.
+- 직접 JDBC, SQLite 파일 하나, 테이블은 `accounts`(잔액 캐시)와 `transactions`(장부, `AUTOINCREMENT`).
+  - 이유: 쿼리가 몇 개뿐이고 SQL이 그대로 보여 읽기 쉽다.
+- 연결 하나를 전용 쓰기 스레드 하나에서만 쓴다. 거래 한 건 = DB 트랜잭션 한 번. DB 커밋이 성공한 뒤에만 메모리 캐시를 갱신한다.
+  - 이유: 메인 스레드를 막지 않고, 스레드가 하나라 거래가 저절로 직렬화되며, 실패해도 되돌릴 메모리 상태가 없다.
+- 잔액 조회(`balanceOf`, `allBalances`)는 캐시에서 바로 읽는다. 쓰기 스레드를 거치지 않는다.
+- 평소 연결은 autoCommit, 쓰기·검사만 명시적 트랜잭션.
+  - 이유: 읽기 후 열린 트랜잭션이 옛 스냅샷을 붙잡으면 외부 변경(복구 도구 등)을 못 본다.
+- `checkIntegrity()`: 쓰기 스레드 위에서 DB 잔액 테이블과 장부 재생을 한 트랜잭션으로 비교한다. 실패하면 잠긴다(`isLocked`). 잠긴 동안 `transfer`는 `Locked`를 돌려주고, 잔액 조회는 된다.
+- `repair()`: 잔액 테이블을 장부 재생 결과로 덮어쓰고 캐시를 다시 채운 뒤 잠금을 푼다.
+- DB에 남는 계좌·주체 문자열(`player:<uuid>`, `government` 등)은 `StorageKeys.kt`에서 직접 정한다.
+  - 이유: 클래스 이름을 바꿔도 저장 형식이 깨지지 않게.
+- 거래 시각은 밀리초로 잘라 저장하고, 돌려주는 `Transaction`도 같은 값을 쓴다.
+
 ### 무결성 검사
 
-`suspend fun Ledger.verifyIntegrity(): IntegrityReport`
+`integrityReportOf(stored, transactions)`가 순수 계산이고, `suspend fun Ledger.verifyIntegrity(): IntegrityReport`는 그 위의 범용 래퍼다.
 1. 전체 잔액 합 == 0 (`BigInteger`로 합산, 중간 오버플로 방지)
 2. 저장된 잔액 == 거래 기록을 처음부터 재생한 잔액 (불일치는 `BalanceMismatch`로 보고)
 
-서버 시작 시, 송금이 일어나기 전에 호출한다.
+범용 `verifyIntegrity`는 잔액과 장부를 따로 읽으므로 송금이 없을 때 호출한다. `SqliteLedger.checkIntegrity`는 한 시점으로 묶어 검사하므로 언제든 쓸 수 있다.
 - 이유: 저장된 잔액은 캐시이고 진실은 거래 기록이다. 검사 도중 송금이 끼어들면 두 값이 서로 다른 시점을 가리킨다.
 
 ## 코드 스타일: 잘 읽히는 클린 코드
@@ -107,7 +125,8 @@ interface Ledger {
   - 이유: "무엇" 주석은 코드와 쉽게 어긋난다.
 - 한 번만 쓰이는 짧은 로직은 굳이 함수로 빼지 않는다.
   - 이유: 읽는 사람이 정의를 찾아 왔다 갔다 하게 만든다.
-- 테스트는 `kotlin.test`, 코루틴 테스트는 `runBlocking`.
+- 테스트는 `kotlin.test`, 코루틴 테스트는 `runBlocking<Unit>`.
+  - 이유: 마지막 식이 값을 돌려주면 테스트 메서드가 void가 아니게 되어 JUnit이 조용히 건너뛴다.
 
 ## 빌드·테스트
 

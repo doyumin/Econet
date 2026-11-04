@@ -18,6 +18,7 @@ dependencies {
     implementation(libs.kotlin.stdlib)
     compileOnly(libs.paper.api)
     implementation(libs.sqlite.jdbc)
+    implementation(libs.kotlinx.coroutines.core)
 }
 
 kotlin {

@@ -19,19 +19,10 @@ class InMemoryLedger(private val clock: Clock) : Ledger {
         actor: Actor,
         memo: String?,
     ): TransferResult = mutex.withLock {
-        if (from == to) return TransferResult.Failure.SameAccount
-        if (!kind.permits(from, to)) return TransferResult.Failure.InvalidRoute
-
-        val fromBalance = balances[from] ?: Balance.ZERO
-        val toBalance = balances[to] ?: Balance.ZERO
-        if (!from.allowsNegativeBalance && !fromBalance.covers(amount)) {
-            return TransferResult.Failure.InsufficientFunds(fromBalance, amount)
-        }
-
-        val (newFromBalance, newToBalance) = try {
-            (fromBalance - amount) to (toBalance + amount)
-        } catch (e: ArithmeticException) {
-            return TransferResult.Failure.Overflow
+        val decision = decideTransfer(from, to, amount, kind) { balances[it] ?: Balance.ZERO }
+        val (newFromBalance, newToBalance) = when (decision) {
+            is TransferDecision.Rejected -> return decision.failure
+            is TransferDecision.Approved -> decision
         }
 
         val transaction = Transaction(

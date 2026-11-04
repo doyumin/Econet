@@ -38,7 +38,7 @@ class InMemoryLedgerTest {
     }
 
     @Test
-    fun `transfer moves money and records the transaction`() = runBlocking {
+    fun `transfer moves money and records the transaction`() = runBlocking<Unit> {
         fund(alice, 100)
         val actor = Actor.Player(alice.uuid)
 
@@ -52,7 +52,7 @@ class InMemoryLedgerTest {
     }
 
     @Test
-    fun `history is newest first and respects the limit`() = runBlocking {
+    fun `history is newest first and respects the limit`() = runBlocking<Unit> {
         fund(alice, 100)
         repeat(3) { ledger.transfer(alice, bob, Amount(1), TxKind.Transfer, admin) }
 
@@ -63,7 +63,7 @@ class InMemoryLedgerTest {
     }
 
     @Test
-    fun `insufficient funds leaves balances untouched`() = runBlocking {
+    fun `insufficient funds leaves balances untouched`() = runBlocking<Unit> {
         fund(alice, 10)
 
         val result = ledger.transfer(alice, bob, Amount(11), TxKind.Transfer, admin)
@@ -74,14 +74,14 @@ class InMemoryLedgerTest {
     }
 
     @Test
-    fun `sending to the same account fails`() = runBlocking {
+    fun `sending to the same account fails`() = runBlocking<Unit> {
         fund(alice, 10)
 
         assertEquals(Failure.SameAccount, ledger.transfer(alice, alice, Amount(1), TxKind.Transfer, admin))
     }
 
     @Test
-    fun `overflow on the receiving side fails without changing anything`() = runBlocking {
+    fun `overflow on the receiving side fails without changing anything`() = runBlocking<Unit> {
         mintToGovernment(Long.MAX_VALUE)
         val before = ledger.allBalances()
         val result = ledger.transfer(Issuance, Government, Amount(1), TxKind.Mint, admin)
@@ -91,7 +91,7 @@ class InMemoryLedgerTest {
     }
 
     @Test
-    fun `routes through special accounts are enforced`() = runBlocking {
+    fun `routes through special accounts are enforced`() = runBlocking<Unit> {
         fund(alice, 100)
         val invalid = listOf(
             Triple(Issuance, alice, TxKind.Mint),
@@ -112,7 +112,7 @@ class InMemoryLedgerTest {
     }
 
     @Test
-    fun `cash moves through the cash pool for players and government`() = runBlocking {
+    fun `cash moves through the cash pool for players and government`() = runBlocking<Unit> {
         fund(alice, 100)
         mintToGovernment(50)
 
@@ -126,7 +126,7 @@ class InMemoryLedgerTest {
     }
 
     @Test
-    fun `mint drives issuance negative and keeps the total at zero`() = runBlocking {
+    fun `mint drives issuance negative and keeps the total at zero`() = runBlocking<Unit> {
         mintToGovernment(1_000)
 
         assertEquals(Balance(-1_000), ledger.balanceOf(Issuance))
@@ -135,7 +135,7 @@ class InMemoryLedgerTest {
     }
 
     @Test
-    fun `burn returns money to issuance`() = runBlocking {
+    fun `burn returns money to issuance`() = runBlocking<Unit> {
         mintToGovernment(1_000)
 
         assertIs<TransferResult.Success>(ledger.transfer(Government, Issuance, Amount(400), TxKind.Burn, admin))
@@ -145,7 +145,7 @@ class InMemoryLedgerTest {
     }
 
     @Test
-    fun `government cannot burn more than it holds`() = runBlocking {
+    fun `government cannot burn more than it holds`() = runBlocking<Unit> {
         mintToGovernment(10)
 
         val result = ledger.transfer(Government, Issuance, Amount(11), TxKind.Burn, admin)
