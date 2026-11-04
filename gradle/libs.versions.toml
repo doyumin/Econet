@@ -1,6 +1,7 @@
 [versions]
 kotlin = "2.4.21"
 sqlite = "3.53.4.0"
+kotlinx-coroutines = "1.11.0"
 
 paper-api = "26.3.build.+"
 minecraft = "26.3"
@@ -11,6 +12,7 @@ run-task = "3.1.0"
 [libraries]
 paper-api = { module = "io.papermc.paper:paper-api", version.ref = "paper-api" }
 kotlin-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib-jdk8", version.ref = "kotlin" }
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
 sqlite-jdbc = { module = "org.xerial:sqlite-jdbc", version.ref = "sqlite" }
 
 [plugins]
