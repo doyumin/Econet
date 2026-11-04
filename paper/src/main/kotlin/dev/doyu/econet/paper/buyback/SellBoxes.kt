@@ -36,6 +36,7 @@ class SellBoxes(
     private val money: MoneyFormat,
     private val clock: Clock,
     private val alertAdmins: (String) -> Unit,
+    private val isCoin: (ItemStack) -> Boolean,
 ) : Listener {
     private val uiTag = NamespacedKey(plugin, "sell_box_ui")
     private val open = mutableMapOf<UUID, SellBox>()
@@ -115,8 +116,13 @@ class SellBoxes(
                 saveMarketState()
                 player.sendMessage("정부에 판매했습니다. 받은 금액: ${money.display(outcome.payout)}")
                 if (outcome.returned.isNotEmpty()) player.sendMessage("매입하지 않는 아이템은 돌려드렸습니다.")
+                // 실수로 동전을 시세보다 싸게 팔지 않도록 매입하지 않고, 대신 제 값에 바꾸는 방법을 알려 준다.
+                if (outcome.returned.any(isCoin)) player.sendMessage("동전은 매입하지 않습니다. /입금 으로 예금하세요.")
             }
-            is SaleOutcome.NothingToSell -> player.sendMessage("판매할 아이템이 없거나 1듄 미만이라 모두 돌려드렸습니다.")
+            is SaleOutcome.NothingToSell -> {
+                player.sendMessage("판매할 아이템이 없거나 1듄 미만이라 모두 돌려드렸습니다.")
+                if (outcome.returned.any(isCoin)) player.sendMessage("동전은 매입하지 않습니다. /입금 으로 예금하세요.")
+            }
             is SaleOutcome.Refused -> {
                 val failure = outcome.failure
                 if (failure is TransferResult.Failure.InsufficientFunds) {

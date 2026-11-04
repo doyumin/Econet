@@ -2,7 +2,9 @@ package dev.doyu.econet.paper.command
 
 import dev.doyu.econet.core.AccountId
 import dev.doyu.econet.core.Balance
+import dev.doyu.econet.paper.cash.CashDesk
 import dev.doyu.econet.paper.format.MoneyFormat
+import dev.doyu.econet.paper.format.parseAmount
 import dev.doyu.econet.paper.integrity.IntegrityWatch
 import dev.doyu.econet.paper.storage.SqliteLedger
 import io.papermc.paper.command.brigadier.BasicCommand
@@ -11,12 +13,14 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.bukkit.Server
 import org.bukkit.command.CommandSender
+import org.bukkit.entity.Player
 import java.util.logging.Logger
 
 /** 관리자용 장부 점검 명령어. 하위 명령어는 영어와 한글 둘 다 받는다. */
 class EconetCommand(
     private val ledger: SqliteLedger,
     private val integrity: IntegrityWatch,
+    private val cashDesk: CashDesk,
     private val money: MoneyFormat,
     private val scope: CoroutineScope,
     private val server: Server,
@@ -28,7 +32,9 @@ class EconetCommand(
             "status", "상태" -> scope.launch { showStatus(sender) }
             "verify", "검사" -> scope.launch { verify(sender) }
             "repair", "복구" -> scope.launch { repair(sender) }
-            else -> sender.sendMessage("사용법: /econet <status|verify|repair>")
+            // 동전을 손에 쥐여 줘야 하므로 메인 스레드에서 바로 처리한다.
+            "coins", "현금" -> issueCoins(sender, args.getOrNull(1))
+            else -> sender.sendMessage("사용법: /econet <status|verify|repair|coins>")
         }
     }
 
@@ -65,6 +71,21 @@ class EconetCommand(
         sender.sendMessage(if (report.isIntact) "잔액을 장부 기준으로 복구하고 거래 잠금을 풀었습니다." else "복구 후에도 불일치가 남아 있습니다. 서버 로그를 확인하세요.")
     }
 
+    /** 이벤트용 동전은 관리자 개인 예금이 아니라 정부 금고에서 꺼낸다(DESIGN 2장). */
+    private fun issueCoins(sender: CommandSender, amountText: String?) {
+        if (sender !is Player) {
+            sender.sendMessage("동전을 받을 플레이어만 쓸 수 있습니다.")
+            return
+        }
+        val amount = amountText?.let(::parseAmount)
+        if (amount == null) {
+            sender.sendMessage("사용법: /econet coins <금액>  (정부 금고에서 꺼내 동전으로 받습니다)")
+            return
+        }
+        cashDesk.withdraw(sender, amount, AccountId.Government, sender.asAdminActor())
+        logger.info("${sender.name} issued ${money.plain(amount)} in coins from the treasury")
+    }
+
     private fun describe(account: AccountId): String = when (account) {
         is AccountId.Player -> server.getOfflinePlayer(account.uuid).name ?: account.uuid.toString()
         AccountId.Government -> "정부 금고"
@@ -77,6 +98,6 @@ class EconetCommand(
 
     private companion object {
         const val MAX_LISTED_MISMATCHES = 10
-        val SUBCOMMANDS = listOf("status", "verify", "repair", "상태", "검사", "복구")
+        val SUBCOMMANDS = listOf("status", "verify", "repair", "coins", "상태", "검사", "복구", "현금")
     }
 }

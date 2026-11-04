@@ -4,7 +4,13 @@ import dev.doyu.econet.paper.buyback.BuybackMarket
 import dev.doyu.econet.paper.buyback.MarketStateFile
 import dev.doyu.econet.paper.buyback.SellBoxes
 import dev.doyu.econet.paper.buyback.SellCommand
+import dev.doyu.econet.paper.cash.CashDesk
+import dev.doyu.econet.paper.cash.CoinGuard
+import dev.doyu.econet.paper.cash.CoinItems
 import dev.doyu.econet.paper.command.ADMIN_PERMISSION
+import dev.doyu.econet.paper.command.ChangeCommand
+import dev.doyu.econet.paper.command.DepositCommand
+import dev.doyu.econet.paper.command.WithdrawCommand
 import dev.doyu.econet.paper.command.BalanceCommand
 import dev.doyu.econet.paper.command.EconetCommand
 import dev.doyu.econet.paper.command.MintCommand
@@ -59,18 +65,24 @@ class EconetPlugin : JavaPlugin() {
 
         val market = BuybackMarket(settings.buyback.prices, settings.buyback.pricing, marketState.load())
         warnAboutUnknownItems(settings.buyback.prices.keys)
-        val sellBoxes = SellBoxes(this, ledger, market, marketState, money, clock, ::alertAdmins)
+        val coins = CoinItems(this, money)
+        val cashDesk = CashDesk(ledger, coins, money, server, logger, ::alertAdmins)
+        val sellBoxes = SellBoxes(this, ledger, market, marketState, money, clock, ::alertAdmins, coins::isCoin)
         this.sellBoxes = sellBoxes
 
         server.pluginManager.registerEvents(LockNotice(ledger), this)
         server.pluginManager.registerEvents(sellBoxes, this)
+        server.pluginManager.registerEvents(CoinGuard(coins), this)
         lifecycleManager.registerEventHandler(LifecycleEvents.COMMANDS) { event ->
             val commands = event.registrar()
             commands.register("balance", "잔액을 확인합니다.", listOf("잔액", "bal"), BalanceCommand(ledger, money, scope, server))
             commands.register("pay", "다른 플레이어에게 송금합니다.", listOf("송금"), PayCommand(ledger, money, scope, server))
             commands.register("mint", "정부 금고에 돈을 발행합니다.", listOf("발행"), MintCommand(ledger, money, scope, logger))
             commands.register("sell", "정부에 아이템을 판매합니다.", listOf("판매"), SellCommand(ledger, sellBoxes))
-            commands.register("econet", "장부를 점검합니다.", listOf("경제"), EconetCommand(ledger, integrity, money, scope, server, logger))
+            commands.register("withdraw", "예금을 동전으로 인출합니다.", listOf("인출"), WithdrawCommand(cashDesk))
+            commands.register("deposit", "인벤토리의 동전을 모두 예금합니다.", listOf("입금"), DepositCommand(cashDesk))
+            commands.register("change", "동전을 쪼개거나 합칩니다.", listOf("잔돈"), ChangeCommand(cashDesk))
+            commands.register("econet", "장부를 점검합니다.", listOf("경제"), EconetCommand(ledger, integrity, cashDesk, money, scope, server, logger))
         }
     }
 
