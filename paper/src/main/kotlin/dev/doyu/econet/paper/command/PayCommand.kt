@@ -1,91 +1,65 @@
 package dev.doyu.econet.paper.command
 
-import dev.doyu.econet.economy.AccountManager
-import dev.doyu.econet.economy.Money
-import org.bukkit.Bukkit
-import org.bukkit.command.Command
-import org.bukkit.command.CommandExecutor
-import org.bukkit.command.CommandSender
-import org.bukkit.command.TabCompleter
+import dev.doyu.econet.core.AccountId
+import dev.doyu.econet.core.Actor
+import dev.doyu.econet.core.Ledger
+import dev.doyu.econet.core.TransferResult
+import dev.doyu.econet.core.TxKind
+import dev.doyu.econet.paper.format.MoneyFormat
+import dev.doyu.econet.paper.format.parseAmount
+import io.papermc.paper.command.brigadier.BasicCommand
+import io.papermc.paper.command.brigadier.CommandSourceStack
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
+import org.bukkit.Server
 import org.bukkit.entity.Player
 
 class PayCommand(
-    private val accountManager: AccountManager
-) : CommandExecutor, TabCompleter {
-
-    override fun onCommand(
-        sender: CommandSender,
-        command: Command,
-        label: String,
-        args: Array<out String>
-    ): Boolean {
-        if (sender !is Player) {
-            sender.sendMessage("이 명령어는 플레이어만 사용할 수 있습니다.")
-            return true
+    private val ledger: Ledger,
+    private val money: MoneyFormat,
+    private val scope: CoroutineScope,
+    private val server: Server,
+) : BasicCommand {
+    override fun execute(source: CommandSourceStack, args: Array<String>) {
+        val sender = source.sender as? Player
+        if (sender == null) {
+            source.sender.sendMessage("플레이어만 송금할 수 있습니다.")
+            return
         }
-
         if (args.size != 2) {
-            sender.sendMessage("§c사용법: /pay <플레이어> <금액>")
-            return true
+            sender.sendMessage("사용법: /pay <플레이어> <금액>")
+            return
+        }
+        val target = server.findKnownPlayer(args[0])
+        if (target == null) {
+            sender.sendMessage("${args[0]}님은 이 서버에 접속한 적이 없습니다.")
+            return
+        }
+        val amount = parseAmount(args[1])
+        if (amount == null) {
+            sender.sendMessage("금액은 1 이상의 정수여야 합니다.")
+            return
         }
 
-        val recipient = Bukkit.getOfflinePlayerIfCached(args[0])
-        if (recipient == null) {
-            sender.sendMessage("§c해당 플레이어를 찾을 수 없습니다.")
-            return true
-        }
-
-        if (recipient.uniqueId == sender.uniqueId) {
-            sender.sendMessage("§c자기 자신에게 이체할 수 없습니다.")
-            return true
-        }
-
-        val amount = args[1].toLongOrNull()
-        if (amount == null || amount <= 0) {
-            sender.sendMessage("§c금액은 0보다 큰 정수여야 합니다.")
-            return true
-        }
-
-        val from = accountManager.getAccountByOwner(sender.uniqueId)
-        val to = accountManager.getAccountByOwner(recipient.uniqueId)
-
-        try {
-            if (!accountManager.transfer(from, to, Money(amount))) {
-                sender.sendMessage("§c잔액이 부족합니다.")
-                return true
+        scope.launch {
+            val result = ledger.transfer(
+                from = AccountId.Player(sender.uniqueId),
+                to = AccountId.Player(target.uniqueId),
+                amount = amount,
+                kind = TxKind.Transfer,
+                actor = Actor.Player(sender.uniqueId),
+            )
+            when (result) {
+                is TransferResult.Success -> {
+                    val remaining = ledger.balanceOf(AccountId.Player(sender.uniqueId))
+                    sender.sendMessage("${target.name}님에게 ${money.display(amount)}을 보냈습니다. 남은 잔액: ${money.display(remaining)}")
+                    target.player?.sendMessage("${sender.name}님에게서 ${money.display(amount)}을 받았습니다.")
+                }
+                is TransferResult.Failure -> sender.sendMessage(failureMessage(result, money))
             }
-        } catch (e: ArithmeticException) {
-            sender.sendMessage("§c상대방 잔액 한도를 초과하여 이체할 수 없습니다.")
-            return true
         }
-
-        val recipientName = recipient.name ?: args[0]
-        sender.sendMessage("§a${recipientName}님에게 ${Money(amount)} 이체 완료.")
-        Bukkit.getPlayer(recipient.uniqueId)?.sendMessage(
-            "§a${sender.name}님이 ${Money(amount)}을(를) 보냈습니다."
-        )
-        return true
     }
 
-    override fun onTabComplete(
-        sender: CommandSender,
-        command: Command,
-        alias: String,
-        args: Array<out String>
-    ): List<String> =
-        when (args.size) {
-            1 -> Bukkit.getOfflinePlayers()
-                .asSequence()
-                .mapNotNull { it.name }
-                .filterNot { it.equals((sender as? Player)?.name, ignoreCase = true) }
-                .filter { it.startsWith(args[0], ignoreCase = true) }
-                .distinct()
-                .sortedWith(String.CASE_INSENSITIVE_ORDER)
-                .toList()
-
-            2 -> listOf("100", "1000", "10000")
-                .filter { it.startsWith(args[1]) }
-
-            else -> emptyList()
-        }
+    override fun suggest(source: CommandSourceStack, args: Array<String>): Collection<String> =
+        if (args.size <= 1) server.onlinePlayerNames(args.firstOrNull().orEmpty()) else emptyList()
 }

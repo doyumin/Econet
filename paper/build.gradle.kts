@@ -14,10 +14,12 @@ repositories {
 
 dependencies {
     testImplementation(kotlin("test"))
+    testImplementation(libs.paper.api)
     implementation(project(":core"))
     implementation(libs.kotlin.stdlib)
     compileOnly(libs.paper.api)
     implementation(libs.sqlite.jdbc)
+    implementation(libs.kotlinx.coroutines.core)
 }
 
 kotlin {
