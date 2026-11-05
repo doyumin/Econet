@@ -26,7 +26,8 @@ class EconetSettingsTest {
         assertEquals(0, BigDecimal("0.2").compareTo(settings.buyback.pricing.floorRatio))
         assertEquals(Duration.ofHours(24), settings.buyback.pricing.recoveryTime)
         assertEquals(Amount(100), settings.insurancePremium)
-        assertEquals(Amount(50), settings.bountyRewards[RAID_CAPTAIN])
+        assertEquals(Amount(100), settings.bountyRewards["minecraft:ender_dragon"])
+        assertEquals(null, settings.bountyRewards["raid-captain"])
         assertEquals(Amount(50), settings.shopPrices["minecraft:name_tag"])
         assertEquals("minecraft:name_tag", settings.shopPrices.keys.first())
     }

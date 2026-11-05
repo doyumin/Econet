@@ -13,13 +13,11 @@ data class EconetSettings(
     val backupsToKeep: Int,
     val buyback: BuybackSettings,
     val insurancePremium: Amount,
-    /** 키는 엔티티 ID 또는 [RAID_CAPTAIN]. */
+    /** 키는 엔티티 ID. */
     val bountyRewards: Map<String, Amount>,
     /** 등록 순서대로 상점에 진열한다. */
     val shopPrices: Map<String, Amount>,
 )
-
-const val RAID_CAPTAIN = "raid-captain"
 
 data class BuybackSettings(
     val prices: Map<String, BigDecimal>,
