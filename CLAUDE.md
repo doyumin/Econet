@@ -190,7 +190,7 @@ interface Ledger {
 
 JDK 25 툴체인이 필요하다.
 
-테스트 서버: `bash scripts/test-server.sh` (`--reset`이면 월드·Econet 데이터를 지우고 새 평지 맵). Windows는 Git Bash에서 실행한다.
+테스트 서버: `bash scripts/test-server.sh [--reset] [--port <번호>]` (`--reset`이면 월드·Econet 데이터를 지우고 새 평지 맵, `--port`는 지정한 값이 `server.properties`에 남아 다음 실행에도 쓰인다). Windows는 Git Bash에서 실행한다.
 - 26.3은 `generator-settings={}`이면 평지 레이어가 없어 오버월드를 만들지 못하므로, 스크립트가 레이어를 직접 적는다.
 - 26.3은 접속자가 없으면 스폰 청크가 로드되지 않는다. 콘솔에서 블록을 확인하려면 먼저 `forceload add`를 한다.
 

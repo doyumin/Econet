@@ -5,13 +5,34 @@
 # 사용법 (Windows는 Git Bash에서):
 #   bash scripts/test-server.sh           # 서버 실행
 #   bash scripts/test-server.sh --reset   # 월드와 Econet 데이터를 지우고 새 평지 맵으로 실행
+#   bash scripts/test-server.sh --port 25566   # 포트 지정 (둘을 같이 써도 된다)
 set -euo pipefail
+
+usage() {
+    echo "사용법: bash scripts/test-server.sh [--reset] [--port <1-65535>]" >&2
+    exit 1
+}
+
+RESET=false
+PORT=""
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --reset) RESET=true; shift ;;
+        --port) [[ $# -ge 2 ]] || usage; PORT="$2"; shift 2 ;;
+        --port=*) PORT="${1#--port=}"; shift ;;
+        *) usage ;;
+    esac
+done
+if [[ -n "$PORT" ]] && ! [[ "$PORT" =~ ^[0-9]+$ && "$PORT" -ge 1 && "$PORT" -le 65535 ]]; then
+    echo "포트는 1~65535 사이의 숫자여야 합니다: $PORT" >&2
+    exit 1
+fi
 
 cd "$(dirname "$0")/.."
 RUN_DIR="paper/run"
 PROPERTIES="$RUN_DIR/server.properties"
 
-if [[ "${1:-}" == "--reset" ]]; then
+if [[ "$RESET" == true ]]; then
     # level-type은 월드를 처음 만들 때만 적용되므로, 평지로 바꾸려면 기존 월드를 지워야 한다.
     echo "월드와 Econet 데이터(장부 포함)를 지웁니다: $RUN_DIR/world, $RUN_DIR/plugins/Econet"
     rm -rf "$RUN_DIR/world" "$RUN_DIR/plugins/Econet"
@@ -40,6 +61,11 @@ set_property spawn-protection 0
 set_property difficulty easy
 set_property max-players 8
 set_property motd 'Econet test server'
+# 지정하지 않으면 건드리지 않는다. 한 번 지정한 포트는 server.properties에 남아 다음 실행에도 쓰인다.
+if [[ -n "$PORT" ]]; then
+    set_property server-port "$PORT"
+    echo "포트: $PORT (접속 주소 localhost:$PORT)"
+fi
 
 # gradlew가 저장소에 실행 권한 없이 올라가 있어도 돌도록 bash로 직접 실행한다.
 bash ./gradlew :paper:runServer
