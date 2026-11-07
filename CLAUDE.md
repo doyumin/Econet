@@ -190,8 +190,15 @@ interface Ledger {
 
 JDK 25 툴체인이 필요하다.
 
-테스트 서버: `bash scripts/test-server.sh [--reset] [--port <번호>]` (`--reset`이면 월드·Econet 데이터를 지우고 새 평지 맵, `--port`는 지정한 값이 `server.properties`에 남아 다음 실행에도 쓰인다). Windows는 Git Bash에서 실행한다.
-- 26.3은 `generator-settings={}`이면 평지 레이어가 없어 오버월드를 만들지 못하므로, 스크립트가 레이어를 직접 적는다.
+테스트 서버는 Gradle 태스크로 띄운다(IntelliJ Gradle 패널의 `paper > run paper`에서도 같다).
+```
+./gradlew :paper:runServer                              # 평지·가벼운 설정으로 실행
+./gradlew :paper:runServer -Pport=25566                 # 포트 지정 (server.properties에 남아 다음에도 쓰인다)
+./gradlew :paper:resetTestServer :paper:runServer       # 월드·Econet 데이터를 지우고 새 평지 맵
+```
+- 설정은 `prepareTestServer`가 `runServer` 전에 `paper/run/server.properties`에 덮어쓴다. 셸 스크립트를 따로 두지 않는다.
+  - 이유: 플랫폼마다 실행 방법이 달라지고, 설정이 Gradle과 스크립트 두 군데로 갈라진다.
+- 26.3은 `generator-settings={}`이면 평지 레이어가 없어 오버월드를 만들지 못하므로, 레이어를 직접 적는다.
 - 26.3은 접속자가 없으면 스폰 청크가 로드되지 않는다. 콘솔에서 블록을 확인하려면 먼저 `forceload add`를 한다.
 
 ## 보험·현상금·상점 (5단계)
