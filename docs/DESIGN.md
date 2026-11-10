@@ -143,6 +143,7 @@ currency:
 core   순수 코틀린. Paper/Vault 의존 없음. Amount, Balance, AccountId, Transaction, Ledger
 storage SQLite. 잔액과 장부를 함께 저장하고, 거래 기록과 잔액 변경을 DB 트랜잭션 하나로 묶는다
 paper  명령어, 이벤트, 포매터, 설정, (나중에) Vault 어댑터
+api    (예정) 외부 플러그인용 공개 인터페이스. 11장
 ```
 
 - Vault의 `Economy`는 `double` 기반이라 core에 들이지 않는다. 필요해지면 paper 쪽 어댑터로 변환한다.
@@ -209,7 +210,27 @@ paper  명령어, 이벤트, 포매터, 설정, (나중에) Vault 어댑터
 
 - 같은 상자 화면 방식. 품목을 클릭하면 가격을 확인하고 구매한다.
 
-## 11. 미정 사항
+## 11. 외부 플러그인용 API (예정)
+
+다른 플러그인(SMPUtil의 구역 보호·텔레포트 비용 등)이 Econet의 돈을 쓸 수 있게 공개 창구를 연다. 필요해질 때 구현한다.
+
+- 저장소에 `api` 모듈을 추가한다. 인터페이스와 결과 타입만 담고, `paper`가 구현해 Bukkit `ServicesManager`에 등록한다.
+- **`Ledger`를 그대로 공개하지 않는다.** 외부 플러그인이 발행하거나 특수 계좌 경로를 쓰면 "합 = 0, 정해진 경로로만"이라는 원칙이 바깥에서 깨진다. API는 좁게 연다.
+
+```kotlin
+interface EconetApi {
+    suspend fun balanceOf(player: UUID): Long
+    suspend fun charge(player: UUID, amount: Long, reason: String): ChargeResult  // Player → Government, Purchase
+    suspend fun reward(player: UUID, amount: Long, reason: String): ChargeResult  // Government → Player, Reward
+}
+```
+
+- 장부에는 호출한 플러그인 이름과 `reason`을 `Actor.System("<plugin>")`과 메모로 남긴다. 어느 플러그인이 왜 돈을 움직였는지 추적할 수 있어야 한다.
+- 외부에서 쓰기 쉽게 API 타입은 `Long`, `UUID` 같은 기본 타입으로 둔다. 내부 value class(`Amount`, `Balance`)는 노출하지 않는다.
+- 배포는 JitPack(GitHub 태그 기반)으로 시작한다. 쓰는 쪽은 `compileOnly`로 받고 `softdepend: [Econet]`을 선언한다.
+- Vault 어댑터는 별개다. Vault는 `double`이고 거래 종류를 구분하지 못하므로, 자체 API를 우선하고 Vault는 남의 플러그인과 연동이 필요할 때 붙인다.
+
+## 12. 미정 사항
 
 - 정부 상점 품목과 가격
 - 보험료
