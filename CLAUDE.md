@@ -201,6 +201,18 @@ JDK 25 툴체인이 필요하다.
 - 26.3은 `generator-settings={}`이면 평지 레이어가 없어 오버월드를 만들지 못하므로, 레이어를 직접 적는다.
 - 26.3은 접속자가 없으면 스폰 청크가 로드되지 않는다. 콘솔에서 블록을 확인하려면 먼저 `forceload add`를 한다.
 
+### 배포 (`./gradlew :paper:deploy`)
+
+- `deployUpload`(shadowJar → SFTP로 `plugins/`) → `deployRestart`(Pterodactyl Client API `power` = restart). 태스크 구현은 `buildSrc/src/main/kotlin/econet/deploy/`.
+- 접속 정보는 저장소에 두지 않는다. `~/.gradle/gradle.properties` 또는 환경 변수(`econet.sftp.host` → `ECONET_SFTP_HOST`)에서 읽고, 없으면 실행할 때 키 이름을 밝혀 실패한다.
+  - 이유: 비밀번호·API 키가 커밋되지 않게. 배포하지 않는 빌드는 설정 없이 돌아야 한다.
+- SFTP 연산만 쓴다(sshj, 순수 Java). Pterodactyl은 셸·scp를 열어 주지 않는다.
+- 순서: `Econet-<버전>.jar.uploading`으로 업로드 → 크기 확인 → 이 플러그인의 옛 파일(`Econet-*.jar`, `Econet-*.jar.uploading`)만 삭제 → 최종 이름으로 rename.
+  - 이유: 업로드가 실패해도 돌아가던 jar가 남고, 임시 파일은 `.jar`로 끝나지 않아 서버가 반쯤 쓴 파일을 읽지 않는다. 다른 플러그인 파일은 이름 접두사로 걸러 절대 건드리지 않는다.
+- 서버 신원은 `~/.ssh/known_hosts` 또는 `econet.sftp.hostKey`(SHA256 지문)로 확인한다. 둘 다 없으면 서버 지문을 알려 주며 멈춘다.
+  - 이유: 확인 없이 접속하면 가로챈 서버에 비밀번호를 넘길 수 있다.
+- 인증은 키(`keyPath`) → 비밀번호 순으로 시도한다. 패널 URL은 https만 허용한다(로컬 시험 서버 제외).
+
 ## 보험·현상금·상점 (5단계)
 
 - 사망 보험: 가입자가 죽으면 보험료(Player → Government, `Purchase`, 주체 `System("insurance")`)를 받고 `keepInventory = true`, `drops`를 비운 뒤 동전만 인벤토리에서 빼 `drops`에 넣는다.
