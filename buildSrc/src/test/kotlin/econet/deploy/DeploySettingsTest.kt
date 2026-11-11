@@ -25,10 +25,13 @@ class DeploySettingsTest {
     @Test
     fun `only this plugin's jars and unfinished uploads are selected`() {
         val names = listOf(
-            "Econet-1.0.jar", "Econet-0.9.jar", "Econet-1.0.jar.uploading",
-            "EconetAddon-1.0.jar", "Vault.jar", "Econet", "Econet-notes.txt", "LuckPerms-5.4.jar",
+            "Econet.jar", "Econet.jar.uploading", "Econet-1.0.jar", "Econet-0.9.jar", "Econet-1.0.jar.uploading",
+            "EconetAddon-1.0.jar", "EconetAddon.jar", "Vault.jar", "Econet", "Econet-notes.txt", "Econet.jar.bak", "LuckPerms-5.4.jar",
         )
 
-        assertEquals(listOf("Econet-0.9.jar", "Econet-1.0.jar", "Econet-1.0.jar.uploading"), ownedRemoteFiles(names, "Econet"))
+        assertEquals(
+            listOf("Econet-0.9.jar", "Econet-1.0.jar", "Econet-1.0.jar.uploading", "Econet.jar", "Econet.jar.uploading"),
+            ownedRemoteFiles(names, "Econet"),
+        )
     }
 }

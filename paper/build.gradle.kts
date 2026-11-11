@@ -112,7 +112,6 @@ val deployUpload = tasks.register<SftpDeployTask>("deployUpload") {
     description = "Uploads the plugin jar to the server's plugins folder over SFTP, replacing older ${rootProject.name}-*.jar files."
     jar.set(pluginJar.flatMap { it.archiveFile })
     remoteBaseName.set(rootProject.name)
-    remoteVersion.set(project.version.toString())
     remoteDirectory.set(deploySetting("econet.sftp.remoteDir").orElse("/plugins"))
     host.set(deploySetting("econet.sftp.host"))
     port.set(deploySetting("econet.sftp.port"))

@@ -35,12 +35,9 @@ abstract class SftpDeployTask : DefaultTask() {
     @get:InputFile
     abstract val jar: RegularFileProperty
 
-    /** 원격 jar 이름의 앞부분. `Econet`이면 `Econet-<버전>.jar`로 올리고 `Econet-*.jar`를 지운다. */
+    /** 원격 jar 이름의 앞부분. `Econet`이면 `Econet.jar`로 올리고 옛 `Econet.jar`·`Econet-*.jar`를 지운다. */
     @get:Input
     abstract val remoteBaseName: Property<String>
-
-    @get:Input
-    abstract val remoteVersion: Property<String>
 
     @get:Input
     abstract val remoteDirectory: Property<String>
@@ -82,7 +79,7 @@ abstract class SftpDeployTask : DefaultTask() {
 
         val localJar = jar.get().asFile
         val directory = remoteDirectory.get().trimEnd('/').ifEmpty { "/" }
-        val finalName = "${remoteBaseName.get()}-${remoteVersion.get()}.jar"
+        val finalName = "${remoteBaseName.get()}.jar"
         val tempName = finalName + UPLOADING_SUFFIX
         logger.lifecycle("Deploying ${localJar.name} (${localJar.length()} bytes) to $user@${address.host}:$port$directory/$finalName")
 
