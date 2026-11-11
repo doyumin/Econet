@@ -207,7 +207,9 @@ JDK 25 툴체인이 필요하다.
 - 접속 정보는 저장소에 두지 않는다. `~/.gradle/gradle.properties` 또는 환경 변수(`econet.sftp.host` → `ECONET_SFTP_HOST`)에서 읽고, 없으면 실행할 때 키 이름을 밝혀 실패한다.
   - 이유: 비밀번호·API 키가 커밋되지 않게. 배포하지 않는 빌드는 설정 없이 돌아야 한다.
 - SFTP 연산만 쓴다(sshj, 순수 Java). Pterodactyl은 셸·scp를 열어 주지 않는다.
-- 순서: `Econet-<버전>.jar.uploading`으로 업로드 → 크기 확인 → 이 플러그인의 옛 파일(`Econet-*.jar`, `Econet-*.jar.uploading`)만 삭제 → 최종 이름으로 rename.
+- 서버의 파일명은 버전 없이 `Econet.jar`로 고정한다.
+  - 이유: 버전이 올라도 같은 이름을 덮어쓰면 되고, 버전이 다른 jar가 둘 남아 플러그인이 두 번 로드되는 일이 없다.
+- 순서: `Econet.jar.uploading`으로 업로드 → 크기 확인 → 이 플러그인의 옛 파일(`Econet.jar`, 옛 `Econet-*.jar`, `*.jar.uploading`)만 삭제 → 최종 이름으로 rename.
   - 이유: 업로드가 실패해도 돌아가던 jar가 남고, 임시 파일은 `.jar`로 끝나지 않아 서버가 반쯤 쓴 파일을 읽지 않는다. 다른 플러그인 파일은 이름 접두사로 걸러 절대 건드리지 않는다.
 - 서버 신원은 `~/.ssh/known_hosts` 또는 `econet.sftp.hostKey`(SHA256 지문)로 확인한다. 둘 다 없으면 서버 지문을 알려 주며 멈춘다.
   - 이유: 확인 없이 접속하면 가로챈 서버에 비밀번호를 넘길 수 있다.

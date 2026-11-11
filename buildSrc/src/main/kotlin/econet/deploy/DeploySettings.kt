@@ -39,12 +39,14 @@ fun parseSftpAddress(text: String): SftpAddress {
 }
 
 /**
- * 원격 폴더에서 지울 파일: 이 플러그인의 jar(`Econet-*.jar`)와 이전에 끊긴 업로드의 임시 파일(`Econet-*.jar.uploading`)뿐이다.
+ * 원격 폴더에서 지울 파일: 이 플러그인의 jar(`Econet.jar`, 버전을 붙이던 시절의 `Econet-*.jar`)와 끊긴 업로드의 임시 파일(`*.jar.uploading`)뿐이다.
  * 다른 플러그인 파일은 절대 건드리지 않도록 이름 접두사까지 정확히 맞춘다.
  */
 fun ownedRemoteFiles(names: Collection<String>, baseName: String): List<String> =
     names.filter { name ->
-        '/' !in name && name.startsWith("$baseName-") && (name.endsWith(".jar") || name.endsWith(".jar$UPLOADING_SUFFIX"))
+        val isOwnName = name.startsWith("$baseName-") || name.startsWith("$baseName.jar")
+        val isJarOrUnfinished = name.endsWith(".jar") || name.endsWith(".jar$UPLOADING_SUFFIX")
+        '/' !in name && isOwnName && isJarOrUnfinished
     }.sorted()
 
 const val UPLOADING_SUFFIX = ".uploading"
