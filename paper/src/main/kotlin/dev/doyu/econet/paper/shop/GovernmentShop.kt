@@ -10,6 +10,7 @@ import dev.doyu.econet.paper.fitsInInventory
 import dev.doyu.econet.paper.format.MoneyFormat
 import dev.doyu.econet.paper.receive
 import kotlinx.coroutines.runBlocking
+import org.bukkit.Material
 import org.bukkit.Server
 import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
@@ -27,18 +28,25 @@ import java.util.logging.Logger
  */
 class GovernmentShop(
     private val ledger: Ledger,
-    private val items: List<ShopItem>,
+    private val catalog: ShopCatalog,
     private val money: MoneyFormat,
     private val server: Server,
     private val logger: Logger,
 ) : Listener {
     fun open(player: Player) {
+        val items = displayedItems()
         if (items.isEmpty()) {
             player.sendMessage("상점에 진열된 물건이 없습니다.")
             return
         }
         player.openInventory(ShopMenu(items, server, money).inventory)
     }
+
+    /** 아이템 종류로 바꿀 수 없는 품목(오타·옛 이름)은 진열하지 않는다. 시작할 때 경고한다. */
+    private fun displayedItems(): List<ShopItem> =
+        catalog.prices().mapNotNull { (key, price) ->
+            Material.matchMaterial(key)?.takeIf { it.isItem }?.let { ShopItem(it, price) }
+        }.take(ShopCatalog.MAX_ITEMS)
 
     /** 진열품이 플레이어 인벤토리로 새어 나가지 않도록, 상점이 열려 있는 동안의 클릭은 모두 막고 구매만 처리한다. */
     @EventHandler(priority = EventPriority.HIGHEST)

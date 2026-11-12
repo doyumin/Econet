@@ -4,7 +4,6 @@ import dev.doyu.econet.paper.buyback.BuybackMarket
 import dev.doyu.econet.paper.buyback.MarketStateFile
 import dev.doyu.econet.paper.buyback.SellBoxes
 import dev.doyu.econet.paper.buyback.SellCommand
-import dev.doyu.econet.core.Amount
 import dev.doyu.econet.paper.admin.CoinCensus
 import dev.doyu.econet.paper.admin.InventoryInspector
 import dev.doyu.econet.paper.admin.OfflinePlayerItems
@@ -30,8 +29,9 @@ import dev.doyu.econet.paper.insurance.InsurancePolicies
 import dev.doyu.econet.paper.integrity.IntegrityWatch
 import dev.doyu.econet.paper.integrity.LockNotice
 import dev.doyu.econet.paper.shop.GovernmentShop
+import dev.doyu.econet.paper.shop.ShopAdminCommand
+import dev.doyu.econet.paper.shop.ShopCatalog
 import dev.doyu.econet.paper.shop.ShopCommand
-import dev.doyu.econet.paper.shop.ShopItem
 import dev.doyu.econet.paper.storage.SqliteLedger
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -87,7 +87,9 @@ class EconetPlugin : JavaPlugin() {
         this.sellBoxes = sellBoxes
 
         val policies = InsurancePolicies(dataFolder.resolve("insurance.yml"))
-        val shop = GovernmentShop(ledger, shopItems(settings.shopPrices), money, server, logger)
+        val shopCatalog = ShopCatalog(dataFolder.resolve("shop.yml"), settings.shopPrices)
+        warnAboutUnknownShopItems(shopCatalog.prices().keys)
+        val shop = GovernmentShop(ledger, shopCatalog, money, server, logger)
 
         val offlineItems = OfflinePlayerItems(server, logger)
         val inspector = InventoryInspector(server, offlineItems)
@@ -113,6 +115,7 @@ class EconetPlugin : JavaPlugin() {
             commands.register("change", "동전을 쪼개거나 합칩니다.", listOf("잔돈"), ChangeCommand(cashDesk))
             commands.register("insurance", "사망 보험에 가입하거나 해지합니다.", listOf("보험"), InsuranceCommand(policies, settings.insurancePremium, money))
             commands.register("shop", "정부 상점을 엽니다.", listOf("상점"), ShopCommand(shop))
+            commands.register("shopadmin", "상점 품목을 추가하거나 뺍니다.", listOf("상점관리"), ShopAdminCommand(shopCatalog, money, logger))
             commands.register("econet", "장부를 점검합니다.", listOf("경제"), EconetCommand(ledger, integrity, cashDesk, inspector, census, backup, money, scope, server, logger))
         }
     }
@@ -164,19 +167,16 @@ class EconetPlugin : JavaPlugin() {
         }
     }
 
-    /** 상점 품목은 아이템 종류로 바꿀 수 있어야 진열할 수 있다. 오타 난 품목은 경고하고 뺀다. */
-    private fun shopItems(prices: Map<String, Amount>): List<ShopItem> {
-        val items = prices.mapNotNull { (key, price) ->
-            val material = Material.matchMaterial(key)?.takeIf { it.isItem }
-            if (material == null) logger.warning("shop.items.$key is not a known item")
-            material?.let { ShopItem(it, price) }
+    /** 아이템 종류로 바꿀 수 없는 상점 품목은 진열되지 않는다. 오타가 조용히 "안 팔림"이 되지 않게 시작할 때 경고한다. */
+    private fun warnAboutUnknownShopItems(itemKeys: Set<String>) {
+        for (key in itemKeys) {
+            val material = Material.matchMaterial(key)
+            if (material == null || !material.isItem) logger.warning("shop.yml: $key is not a known item")
         }
-        if (items.size > MAX_SHOP_ITEMS) logger.warning("Only the first $MAX_SHOP_ITEMS shop items are shown")
-        return items.take(MAX_SHOP_ITEMS)
+        if (itemKeys.size > ShopCatalog.MAX_ITEMS) logger.warning("Only the first ${ShopCatalog.MAX_ITEMS} shop items are shown")
     }
 
     private companion object {
-        const val MAX_SHOP_ITEMS = 54
         const val TICKS_PER_SECOND = 20L
         const val SHUTDOWN_GRACE_MILLIS = 5_000L
     }
