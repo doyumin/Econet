@@ -70,7 +70,8 @@ bounty:
     minecraft:ender_dragon: 100
 
 shop:
-  # 정부 상점 품목과 한 개 가격(듄). 임시값: 서버 운영 후 정한다. 최대 54종.
+  # 정부 상점의 시작 품목과 한 개 가격(듄). 임시값: 서버 운영 후 정한다. 최대 54종.
+  # plugins/Econet/shop.yml이 없을 때 한 번만 복사된다. 그 뒤로는 /상점관리로 바꾸고, 여기를 고쳐도 반영되지 않는다.
   items:
     minecraft:name_tag: 50
     minecraft:saddle: 80
