@@ -74,6 +74,7 @@ shop:
   items:
     minecraft:name_tag: 50
     minecraft:saddle: 80
+    minecraft:lead: 20
     minecraft:experience_bottle: 5
     minecraft:clay: 2
     minecraft:sandstone: 1
