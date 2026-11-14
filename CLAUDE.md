@@ -5,6 +5,7 @@
 
 ## 모듈
 
+- `api` — 외부 플러그인용 공개 인터페이스(아래 "외부 API").
 - `core` — 순수 Kotlin 도메인. 패키지 `dev.doyu.econet.core`. Paper/Bukkit 의존성 0, 외부 의존성은 `kotlinx-coroutines-core`만.
   - 이유: 경제 규칙을 서버 없이 테스트하고, 플랫폼이 바뀌어도 그대로 쓰기 위해.
 - `paper` — Paper 플러그인. 커맨드, 저장소 구현, 표시(포매팅), 설정을 담당한다.
@@ -163,6 +164,15 @@ interface Ledger {
 - 동전은 제작 재료로 쓸 수 없다(조합대 결과를 비우고, 크래프터 제작을 취소한다).
   - 이유: 레시피 책 자동 채우기가 동전을 집어 넣어 큰돈이 실수로 사라질 수 있다.
 - 동전은 정부 매입 대상이 아니다(손대지 않은 기본 아이템이 아니므로 자동으로 걸러진다). 판매 상자에 넣으면 돌려주며 `/입금`을 안내한다.
+
+## 외부 API (`api` 모듈)
+
+- `api` — 외부 플러그인이 `compileOnly`로 받는 모듈. `EconetApi`와 `ChargeResult`만 있고 Kotlin 표준 라이브러리 외 의존성은 없다. core 타입(`Amount`, `Balance`)은 노출하지 않고 `Long`·`UUID`만 쓴다.
+- 구현은 `paper`의 `LedgerEconetApi`. 시작 때 `ServicesManager`에 등록하고 `onDisable`에서 장부를 닫기 전에 해제한다.
+- 경로는 Player ↔ Government 두 방향뿐이다(`charge` = `Purchase`, `reward` = `Reward`). 발행·현금 경로는 열지 않는다.
+  - 이유: 바깥에서 쓰면 "합 = 0, 정해진 경로로만" 원칙이 깨진다.
+- 장부 주체는 `Actor.System(plugin)`, 메모는 `reason`. `plugin`이 비면 `IllegalArgumentException`(호출 코드의 버그), 금액 0 이하는 `ChargeResult.InvalidAmount`(값).
+- `LedgerEconetApi`는 Player↔Government에서 나올 수 없는 `SameAccount`·`InvalidRoute`를 `Rejected`로 돌려준다. `else`로 뭉개지 않고 `when`에 다 적어 core에 실패가 늘면 컴파일러가 알려 주게 한다.
 
 ## 코드 스타일: 잘 읽히는 클린 코드
 
