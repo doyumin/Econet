@@ -19,6 +19,7 @@ repositories {
 dependencies {
     testImplementation(kotlin("test"))
     testImplementation(libs.paper.api)
+    implementation(project(":api"))
     implementation(project(":core"))
     implementation(libs.kotlin.stdlib)
     compileOnly(libs.paper.api)

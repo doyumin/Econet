@@ -1,5 +1,7 @@
 package dev.doyu.econet.paper
 
+import dev.doyu.econet.api.EconetApi
+import dev.doyu.econet.paper.api.LedgerEconetApi
 import dev.doyu.econet.paper.buyback.BuybackMarket
 import dev.doyu.econet.paper.buyback.MarketStateFile
 import dev.doyu.econet.paper.buyback.SellBoxes
@@ -47,6 +49,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import org.bukkit.Material
 import org.bukkit.NamespacedKey
 import org.bukkit.Registry
+import org.bukkit.plugin.ServicePriority
 import org.bukkit.plugin.java.JavaPlugin
 import java.time.Clock
 import java.time.Duration
@@ -97,6 +100,8 @@ class EconetPlugin : JavaPlugin() {
         val backup = SnapshotBackup(server, ledger, offlineItems, dataFolder.resolve("backups"), settings.backupsToKeep, clock)
         scheduleBackups(backup, settings.backupInterval)
 
+        server.servicesManager.register(EconetApi::class.java, LedgerEconetApi(ledger), this, ServicePriority.Normal)
+
         server.pluginManager.registerEvents(LockNotice(ledger), this)
         server.pluginManager.registerEvents(ReadOnlyGuard(), this)
         server.pluginManager.registerEvents(DeathInsurance(ledger, policies, settings.insurancePremium, coins::isCoin, money, logger), this)
@@ -121,6 +126,8 @@ class EconetPlugin : JavaPlugin() {
     }
 
     override fun onDisable() {
+        // 장부를 닫기 전에 외부 플러그인의 접근부터 끊는다.
+        server.servicesManager.unregisterAll(this)
         integrityLoop?.cancel()
         // 장부를 닫기 전에, 열린 판매 상자의 아이템을 정산하거나 돌려준다.
         sellBoxes?.settleAll()

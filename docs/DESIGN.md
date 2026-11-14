@@ -143,7 +143,7 @@ currency:
 core   순수 코틀린. Paper/Vault 의존 없음. Amount, Balance, AccountId, Transaction, Ledger
 storage SQLite. 잔액과 장부를 함께 저장하고, 거래 기록과 잔액 변경을 DB 트랜잭션 하나로 묶는다
 paper  명령어, 이벤트, 포매터, 설정, (나중에) Vault 어댑터
-api    (예정) 외부 플러그인용 공개 인터페이스. 11장
+api    외부 플러그인용 공개 인터페이스. Kotlin 표준 라이브러리 외 의존성 없음. 11장
 ```
 
 - Vault의 `Economy`는 `double` 기반이라 core에 들이지 않는다. 필요해지면 paper 쪽 어댑터로 변환한다.
@@ -210,18 +210,19 @@ api    (예정) 외부 플러그인용 공개 인터페이스. 11장
 
 - 같은 상자 화면 방식. 품목을 클릭하면 가격을 확인하고 구매한다.
 
-## 11. 외부 플러그인용 API (예정)
+## 11. 외부 플러그인용 API
 
-다른 플러그인(SMPUtil의 구역 보호·텔레포트 비용 등)이 Econet의 돈을 쓸 수 있게 공개 창구를 연다. 필요해질 때 구현한다.
+다른 플러그인(SMPUtil의 구역 보호·텔레포트 비용 등)이 Econet의 돈을 쓸 수 있게 공개 창구를 연다. 구현됨(`api` 모듈, `LedgerEconetApi`).
 
-- 저장소에 `api` 모듈을 추가한다. 인터페이스와 결과 타입만 담고, `paper`가 구현해 Bukkit `ServicesManager`에 등록한다.
+- `api` 모듈은 인터페이스와 결과 타입만 담고, `paper`가 구현해 Bukkit `ServicesManager`에 등록한다.
+- 호출한 플러그인을 알아내려고 `charge`/`reward`가 `plugin: String`을 첫 인자로 받는다. 서비스 하나를 여러 플러그인이 공유하므로 호출자를 따로 알 방법이 없어서다.
 - **`Ledger`를 그대로 공개하지 않는다.** 외부 플러그인이 발행하거나 특수 계좌 경로를 쓰면 "합 = 0, 정해진 경로로만"이라는 원칙이 바깥에서 깨진다. API는 좁게 연다.
 
 ```kotlin
 interface EconetApi {
     suspend fun balanceOf(player: UUID): Long
-    suspend fun charge(player: UUID, amount: Long, reason: String): ChargeResult  // Player → Government, Purchase
-    suspend fun reward(player: UUID, amount: Long, reason: String): ChargeResult  // Government → Player, Reward
+    suspend fun charge(plugin: String, player: UUID, amount: Long, reason: String): ChargeResult  // Player → Government, Purchase
+    suspend fun reward(plugin: String, player: UUID, amount: Long, reason: String): ChargeResult  // Government → Player, Reward
 }
 ```
 
