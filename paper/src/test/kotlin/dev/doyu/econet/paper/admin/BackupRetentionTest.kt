@@ -11,4 +11,12 @@ class BackupRetentionTest {
         assertEquals(listOf("2026-01-01T00-00-00Z"), backupsToDelete(names, keep = 2))
         assertEquals(emptyList(), backupsToDelete(names, keep = 5))
     }
+
+    @Test
+    fun `unfinished backups neither count toward the limit nor get chosen for deletion`() {
+        val names = listOf("2026-01-01T00-00-00Z", "2026-01-02T00-00-00Z", "2026-01-03T00-00-00Z.partial", "notes")
+
+        assertEquals(listOf("2026-01-01T00-00-00Z"), backupsToDelete(names, keep = 1))
+        assertEquals(emptyList(), backupsToDelete(names, keep = 2))
+    }
 }

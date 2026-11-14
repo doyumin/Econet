@@ -75,7 +75,12 @@ class EconetPlugin : JavaPlugin() {
 
         val integrity = IntegrityWatch(ledger, logger, ::alertAdmins)
         // 첫 거래가 일어나기 전에 장부를 믿어도 되는지 확인해야 하므로, 시작 시 검사만은 끝날 때까지 기다린다.
-        runBlocking { integrity.check() }
+        // 검사가 실패하면 장부는 이미 잠기고 관리자에게 알렸으므로, 플러그인은 잠긴 채로 켠다(잔액 조회는 되고 거래만 막힌다).
+        try {
+            runBlocking { integrity.check() }
+        } catch (e: Exception) {
+            logger.log(Level.SEVERE, "Startup integrity check could not run; the ledger stays locked", e)
+        }
         integrityLoop = integrity.runEvery(settings.integrityCheckInterval, scope)
 
         val market = BuybackMarket(settings.buyback.prices, settings.buyback.pricing, marketState.load())
@@ -94,7 +99,7 @@ class EconetPlugin : JavaPlugin() {
         val offlineItems = OfflinePlayerItems(server, logger)
         val inspector = InventoryInspector(server, offlineItems)
         val census = CoinCensus(server, coins, offlineItems, logger)
-        val backup = SnapshotBackup(server, ledger, offlineItems, dataFolder.resolve("backups"), settings.backupsToKeep, clock)
+        val backup = SnapshotBackup(server, ledger, offlineItems, dataFolder.resolve("backups"), settings.backupsToKeep, clock, sellBoxes::settleAll)
         scheduleBackups(backup, settings.backupInterval)
 
         server.pluginManager.registerEvents(LockNotice(ledger), this)
