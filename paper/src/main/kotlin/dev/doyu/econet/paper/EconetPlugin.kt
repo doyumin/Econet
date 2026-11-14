@@ -100,7 +100,7 @@ class EconetPlugin : JavaPlugin() {
         val backup = SnapshotBackup(server, ledger, offlineItems, dataFolder.resolve("backups"), settings.backupsToKeep, clock)
         scheduleBackups(backup, settings.backupInterval)
 
-        server.servicesManager.register(EconetApi::class.java, LedgerEconetApi(ledger), this, ServicePriority.Normal)
+        server.servicesManager.register(EconetApi::class.java, LedgerEconetApi(ledger, scope), this, ServicePriority.Normal)
 
         server.pluginManager.registerEvents(LockNotice(ledger), this)
         server.pluginManager.registerEvents(ReadOnlyGuard(), this)

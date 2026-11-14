@@ -171,7 +171,9 @@ interface Ledger {
 - 구현은 `paper`의 `LedgerEconetApi`. 시작 때 `ServicesManager`에 등록하고 `onDisable`에서 장부를 닫기 전에 해제한다.
 - 경로는 Player ↔ Government 두 방향뿐이다(`charge` = `Purchase`, `reward` = `Reward`). 발행·현금 경로는 열지 않는다.
   - 이유: 바깥에서 쓰면 "합 = 0, 정해진 경로로만" 원칙이 깨진다.
-- 장부 주체는 `Actor.System(plugin)`, 메모는 `reason`. `plugin`이 비면 `IllegalArgumentException`(호출 코드의 버그), 금액 0 이하는 `ChargeResult.InvalidAmount`(값).
+- 반환은 `CompletableFuture`(`suspend` 아님). 쓰는 플러그인의 Kotlin 런타임(`Continuation`)과 클래스로더별로 엇갈릴 수 있고 Java도 지원해야 해서다. 코루틴은 `LedgerEconetApi`가 플러그인 scope에서 `future`로 감싼다.
+- 장부 주체는 `Actor.System("plugin:<이름>")`, 메모는 `reason`. 접두사는 외부 플러그인이 `bounty` 같은 내부 주체를 사칭하지 못하게 한다.
+- 배포는 JitPack: `compileOnly("com.github.doyumin.Econet:api:<태그>")` + `softdepend: [Econet]`. `plugin`이 비면 `IllegalArgumentException`(호출 코드의 버그), 금액 0 이하는 `ChargeResult.InvalidAmount`(값).
 - `LedgerEconetApi`는 Player↔Government에서 나올 수 없는 `SameAccount`·`InvalidRoute`를 `Rejected`로 돌려준다. `else`로 뭉개지 않고 `when`에 다 적어 core에 실패가 늘면 컴파일러가 알려 주게 한다.
 
 ## 코드 스타일: 잘 읽히는 클린 코드

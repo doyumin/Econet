@@ -215,14 +215,15 @@ api    외부 플러그인용 공개 인터페이스. Kotlin 표준 라이브러
 다른 플러그인(SMPUtil의 구역 보호·텔레포트 비용 등)이 Econet의 돈을 쓸 수 있게 공개 창구를 연다. 구현됨(`api` 모듈, `LedgerEconetApi`).
 
 - `api` 모듈은 인터페이스와 결과 타입만 담고, `paper`가 구현해 Bukkit `ServicesManager`에 등록한다.
+- `suspend`가 아니라 `CompletableFuture`를 돌려준다. 쓰는 플러그인은 Econet과 다른 클래스로더에서 돌아 Kotlin 런타임(`Continuation`)이 서로 맞는다는 보장이 없고, Java 플러그인도 쓸 수 있어야 해서다. 완료 콜백은 메인 스레드가 아닐 수 있다.
 - 호출한 플러그인을 알아내려고 `charge`/`reward`가 `plugin: String`을 첫 인자로 받는다. 서비스 하나를 여러 플러그인이 공유하므로 호출자를 따로 알 방법이 없어서다.
 - **`Ledger`를 그대로 공개하지 않는다.** 외부 플러그인이 발행하거나 특수 계좌 경로를 쓰면 "합 = 0, 정해진 경로로만"이라는 원칙이 바깥에서 깨진다. API는 좁게 연다.
 
 ```kotlin
 interface EconetApi {
-    suspend fun balanceOf(player: UUID): Long
-    suspend fun charge(plugin: String, player: UUID, amount: Long, reason: String): ChargeResult  // Player → Government, Purchase
-    suspend fun reward(plugin: String, player: UUID, amount: Long, reason: String): ChargeResult  // Government → Player, Reward
+    fun balanceOf(player: UUID): CompletableFuture<Long>
+    fun charge(plugin: String, player: UUID, amount: Long, reason: String): CompletableFuture<ChargeResult>  // Player → Government, Purchase
+    fun reward(plugin: String, player: UUID, amount: Long, reason: String): CompletableFuture<ChargeResult>  // Government → Player, Reward
 }
 ```
 

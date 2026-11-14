@@ -8,6 +8,9 @@ import dev.doyu.econet.core.InMemoryLedger
 import dev.doyu.econet.core.TransferResult
 import dev.doyu.econet.core.TxKind
 import dev.doyu.econet.core.verifyIntegrity
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.runBlocking
 import java.time.Clock
 import java.util.UUID
@@ -18,7 +21,7 @@ import kotlin.test.assertIs
 
 class LedgerEconetApiTest {
     private val ledger = InMemoryLedger(Clock.systemUTC())
-    private val api = LedgerEconetApi(ledger)
+    private val api = LedgerEconetApi(ledger, CoroutineScope(SupervisorJob() + Dispatchers.Default))
     private val player = UUID.randomUUID()
     private val admin = Actor.Admin(UUID.randomUUID())
 
@@ -35,15 +38,15 @@ class LedgerEconetApiTest {
     fun `charge moves money to the government and records plugin and reason`() = runBlocking<Unit> {
         fundPlayer(100)
 
-        val result = api.charge("SMPUtil", player, 30, "teleport")
+        val result = api.charge("SMPUtil", player, 30, "teleport").get()
 
         assertIs<ChargeResult.Success>(result)
-        assertEquals(70, api.balanceOf(player))
+        assertEquals(70, api.balanceOf(player).get())
         assertEquals(30, ledger.balanceOf(AccountId.Government).value)
         val recorded = ledger.history(AccountId.Player(player), 1).single()
         assertEquals(result.transactionId, recorded.id.value)
         assertEquals(TxKind.Purchase, recorded.kind)
-        assertEquals(Actor.System("SMPUtil"), recorded.actor)
+        assertEquals(Actor.System("plugin:SMPUtil"), recorded.actor)
         assertEquals("teleport", recorded.memo)
     }
 
@@ -51,24 +54,24 @@ class LedgerEconetApiTest {
     fun `charge fails without changing anything when the player cannot afford it`() = runBlocking<Unit> {
         fundPlayer(10)
 
-        assertEquals(ChargeResult.InsufficientFunds(balance = 10, required = 30), api.charge("SMPUtil", player, 30, "teleport"))
-        assertEquals(10, api.balanceOf(player))
+        assertEquals(ChargeResult.InsufficientFunds(balance = 10, required = 30), api.charge("SMPUtil", player, 30, "teleport").get())
+        assertEquals(10, api.balanceOf(player).get())
     }
 
     @Test
     fun `reward pays from the government and fails when the treasury is empty`() = runBlocking<Unit> {
         fundGovernment(50)
 
-        assertIs<ChargeResult.Success>(api.reward("SMPUtil", player, 20, "quest"))
-        assertEquals(20, api.balanceOf(player))
-        assertEquals(ChargeResult.InsufficientFunds(balance = 30, required = 40), api.reward("SMPUtil", player, 40, "quest"))
+        assertIs<ChargeResult.Success>(api.reward("SMPUtil", player, 20, "quest").get())
+        assertEquals(20, api.balanceOf(player).get())
+        assertEquals(ChargeResult.InsufficientFunds(balance = 30, required = 40), api.reward("SMPUtil", player, 40, "quest").get())
         assertEquals(TxKind.Reward, ledger.history(AccountId.Player(player), 1).single().kind)
     }
 
     @Test
     fun `non-positive amounts are rejected as a value`() = runBlocking<Unit> {
-        assertEquals(ChargeResult.InvalidAmount, api.charge("SMPUtil", player, 0, "x"))
-        assertEquals(ChargeResult.InvalidAmount, api.reward("SMPUtil", player, -5, "x"))
+        assertEquals(ChargeResult.InvalidAmount, api.charge("SMPUtil", player, 0, "x").get())
+        assertEquals(ChargeResult.InvalidAmount, api.reward("SMPUtil", player, -5, "x").get())
     }
 
     @Test
@@ -79,9 +82,9 @@ class LedgerEconetApiTest {
     @Test
     fun `the sum of all balances stays zero`() = runBlocking<Unit> {
         fundPlayer(100)
-        api.charge("SMPUtil", player, 40, "a")
-        api.reward("SMPUtil", player, 10, "b")
-        api.charge("SMPUtil", player, 1_000, "too much")
+        api.charge("SMPUtil", player, 40, "a").get()
+        api.reward("SMPUtil", player, 10, "b").get()
+        api.charge("SMPUtil", player, 1_000, "too much").get()
 
         assertEquals(0, ledger.allBalances().values.sumOf { it.value })
         assertEquals(true, ledger.verifyIntegrity().isIntact)
