@@ -145,6 +145,19 @@ class SqliteLedgerTest {
     }
 
     @Test
+    fun `a ledger that cannot be read locks transfers instead of passing the check`() = runBlocking<Unit> {
+        val ledger = open()
+        ledger.fund(alice, 100)
+        execute("INSERT INTO transactions (from_account, to_account, amount, kind, actor, at) VALUES ('government', 'government', 1, 'Bogus', 'system:test', 0)")
+
+        assertFailsWith<IllegalArgumentException> { ledger.checkIntegrity() }
+
+        assertTrue(ledger.isLocked)
+        assertEquals(Failure.Locked, ledger.transfer(alice, bob, Amount(1), TxKind.Transfer, admin))
+        assertEquals(Balance(100), ledger.balanceOf(alice))
+    }
+
+    @Test
     fun `repair restores accounts that were deleted from the balance table`() = runBlocking<Unit> {
         val ledger = open()
         ledger.fund(alice, 100)

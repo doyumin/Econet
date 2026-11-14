@@ -15,6 +15,7 @@ import io.papermc.paper.command.brigadier.BasicCommand
 import io.papermc.paper.command.brigadier.CommandSourceStack
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import org.bukkit.Server
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
@@ -45,10 +46,7 @@ class EconetCommand(
             // 아래는 월드·인벤토리를 읽으므로 메인 스레드에서 바로 처리한다.
             "inv", "인벤토리" -> inspect(sender, args.getOrNull(1), inspector::openInventory)
             "ender", "엔더상자" -> inspect(sender, args.getOrNull(1), inspector::openEnderChest)
-            "census", "동전집계" -> {
-                val result = census.count()
-                scope.launch { compareCoins(sender, result) }
-            }
+            "census", "동전집계" -> compareCoins(sender)
             "backup", "백업" -> runBackup(sender)
             else -> sender.sendMessage("사용법: /econet <status|verify|repair|coins|inv|ender|census|backup>")
         }
@@ -72,7 +70,13 @@ class EconetCommand(
     }
 
     private suspend fun verify(sender: CommandSender) {
-        val report = integrity.check()
+        val report = try {
+            integrity.check()
+        } catch (e: Exception) {
+            // check가 이미 로그를 남기고 장부를 잠갔다.
+            sender.sendMessage("장부를 읽지 못해 검사하지 못했고 거래가 잠겼습니다. 서버 로그를 확인하세요.")
+            return
+        }
         if (report.isIntact) {
             sender.sendMessage("장부 이상 없음.")
             return
@@ -85,7 +89,13 @@ class EconetCommand(
     }
 
     private suspend fun repair(sender: CommandSender) {
-        val report = ledger.repair()
+        val report = try {
+            ledger.repair()
+        } catch (e: Exception) {
+            logger.log(Level.SEVERE, "Repair failed", e)
+            sender.sendMessage("복구하지 못했습니다: ${e.message}. 서버 로그를 확인하세요.")
+            return
+        }
         logger.warning("${sender.name} repaired the balance table from the ledger. Intact: ${report.isIntact}")
         sender.sendMessage(if (report.isIntact) "잔액을 장부 기준으로 복구하고 거래 잠금을 풀었습니다." else "복구 후에도 불일치가 남아 있습니다. 서버 로그를 확인하세요.")
     }
@@ -102,8 +112,17 @@ class EconetCommand(
         open(sender, targetName)
     }
 
-    private suspend fun compareCoins(sender: CommandSender, result: CensusResult) {
-        val pool = ledger.balanceOf(AccountId.CashPool)
+    /**
+     * 동전 집계와 CashPool 잔액을 같은 메인 스레드 구간에서 구한다. 인출·입금도 메인 스레드에서 장부를 기다리며 처리되므로,
+     * 이 구간에는 끼어들 수 없어 두 값이 같은 시점을 가리킨다. 집계 뒤에 CashPool을 읽으면 그 사이 입출금이 차이로 잡힌다.
+     */
+    private fun compareCoins(sender: CommandSender) {
+        val result = census.count()
+        val pool = runBlocking { ledger.balanceOf(AccountId.CashPool) }
+        showCoinComparison(sender, result, pool)
+    }
+
+    private fun showCoinComparison(sender: CommandSender, result: CensusResult, pool: Balance) {
         sender.sendMessage("플레이어 ${result.playersCounted}명의 인벤토리·엔더상자 동전: ${money.plain(result.counted)}")
         sender.sendMessage("현금 유통 계좌: ${money.plain(pool)}, 차이: ${pool.value.toBigInteger() - result.counted.toBigInteger()}")
         sender.sendMessage("월드 상자에 둔 동전은 세지 않으므로 차이는 참고용입니다. 차이가 음수면 장부보다 동전이 많다는 뜻입니다.")
