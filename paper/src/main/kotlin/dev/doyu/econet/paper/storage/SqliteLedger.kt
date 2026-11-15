@@ -156,7 +156,13 @@ class SqliteLedger(file: Path, private val clock: Clock) : Ledger, AutoCloseable
      * 캐시가 아니라 DB의 잔액 테이블과 비교한다. 디스크에 남은 것이 다음 시작 때 읽힐 값이기 때문이다.
      */
     suspend fun checkIntegrity(): IntegrityReport = withContext(writer) {
-        val report = readIntegrityReport()
+        val report = try {
+            readIntegrityReport()
+        } catch (e: Exception) {
+            // 장부를 읽지 못하는 것도 믿을 수 없다는 뜻이다. 잠그지 않으면 망가진 장부 위에서 거래가 계속된다.
+            isLocked = true
+            throw e
+        }
         if (!report.isIntact) isLocked = true
         report
     }

@@ -1,6 +1,7 @@
 package dev.doyu.econet.paper.admin
 
 import dev.doyu.econet.paper.cash.CoinItems
+import dev.doyu.econet.paper.cash.MAX_CONTAINER_NESTING
 import dev.doyu.econet.paper.cash.totalValue
 import io.papermc.paper.datacomponent.DataComponentTypes
 import org.bukkit.Server
@@ -56,7 +57,7 @@ class CoinCensus(
             val denomination = coins.denominationOf(item)
             if (denomination != null) value = Math.addExact(value, totalValue(mapOf(denomination to item.amount.toLong())))
             // 꾸러미는 꾸러미를 담을 수 있으므로 깊이를 제한한다.
-            if (depth < MAX_NESTING) value = Math.addExact(value, Math.multiplyExact(valueIn(nestedContents(item), depth + 1), item.amount.toLong()))
+            if (depth < MAX_CONTAINER_NESTING) value = Math.addExact(value, Math.multiplyExact(valueIn(nestedContents(item), depth + 1), item.amount.toLong()))
         }
         return value
     }
@@ -64,8 +65,4 @@ class CoinCensus(
     private fun nestedContents(item: ItemStack): List<ItemStack> =
         item.getData(DataComponentTypes.CONTAINER)?.contents().orEmpty() +
             item.getData(DataComponentTypes.BUNDLE_CONTENTS)?.contents().orEmpty()
-
-    private companion object {
-        const val MAX_NESTING = 4
-    }
 }

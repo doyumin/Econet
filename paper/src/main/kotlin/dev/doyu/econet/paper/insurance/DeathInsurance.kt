@@ -6,6 +6,7 @@ import dev.doyu.econet.core.Amount
 import dev.doyu.econet.core.Ledger
 import dev.doyu.econet.core.TransferResult
 import dev.doyu.econet.core.TxKind
+import dev.doyu.econet.paper.cash.extractNestedCoins
 import dev.doyu.econet.paper.command.failureMessage
 import dev.doyu.econet.paper.format.MoneyFormat
 import kotlinx.coroutines.runBlocking
@@ -58,7 +59,7 @@ class DeathInsurance(
 
     /**
      * keepInventory를 켜면 인벤토리는 비워지지 않지만, drops 목록은 그와 상관없이 떨어진다(Paper 26.3 CraftEventFactory 확인).
-     * 그래서 drops를 비우고, 동전만 인벤토리에서 빼서 drops에 넣는다.
+     * 그래서 drops를 비우고, 동전만 인벤토리에서 빼서 drops에 넣는다. 셜커 상자·꾸러미 안의 동전도 꺼내 떨군다(DESIGN 5장).
      */
     private fun keepEverythingButCoins(event: PlayerDeathEvent) {
         event.keepInventory = true
@@ -66,9 +67,16 @@ class DeathInsurance(
         val inventory = event.player.inventory
         for (slot in 0 until inventory.size) {
             val item = inventory.getItem(slot)
+            if (item == null || item.isEmpty) continue
             if (isCoin(item)) {
-                event.drops += item!!.clone()
+                event.drops += item.clone()
                 inventory.setItem(slot, null)
+            } else {
+                val nested = extractNestedCoins(item, isCoin)
+                if (nested.isNotEmpty()) {
+                    event.drops += nested
+                    inventory.setItem(slot, item)
+                }
             }
         }
     }
