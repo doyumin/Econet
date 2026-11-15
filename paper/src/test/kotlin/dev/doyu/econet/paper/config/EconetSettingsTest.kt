@@ -30,6 +30,19 @@ class EconetSettingsTest {
         assertEquals(null, settings.bountyRewards["raid-captain"])
         assertEquals(Amount(50), settings.shopPrices["minecraft:name_tag"])
         assertEquals("minecraft:name_tag", settings.shopPrices.keys.first())
+        assertEquals(listOf(Amount(1), Amount(10), Amount(50), Amount(100)), settings.coinFlip.bets)
+        assertEquals(0.5, settings.coinFlip.winChance)
+    }
+
+    @Test
+    fun `invalid coin flip settings fail loudly`() {
+        val certainWin = bundledConfig().apply { set("casino.coin-flip.win-chance", 1.0) }
+        val unsorted = bundledConfig().apply { set("casino.coin-flip.bets", listOf(10, 5)) }
+        val tooMany = bundledConfig().apply { set("casino.coin-flip.bets", (1..10).toList()) }
+
+        assertEquals("casino.coin-flip.win-chance must be between 0 and 1 exclusive", assertFailsWith<IllegalArgumentException> { readSettings(certainWin) }.message)
+        assertEquals("casino.coin-flip.bets must be strictly increasing", assertFailsWith<IllegalArgumentException> { readSettings(unsorted) }.message)
+        assertEquals("casino.coin-flip.bets must have 1 to 9 entries", assertFailsWith<IllegalArgumentException> { readSettings(tooMany) }.message)
     }
 
     @Test

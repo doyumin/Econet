@@ -85,3 +85,13 @@ shop:
     minecraft:bubble_coral_block: 5
     minecraft:fire_coral_block: 5
     minecraft:horn_coral_block: 5
+
+casino:
+  # 동전 던지기. 판돈은 인벤토리의 동전으로만 낸다(예금으로는 걸 수 없다). 기계는 /카지노 설치로 등록한다.
+  coin-flip:
+    # 판돈 단계(듄). 작은 것부터 최대 9개. 임시값.
+    bets: [1, 10, 50, 100]
+    # 이길 확률. 이기면 판돈만큼 더 받고 지면 판돈을 잃는다. 0.5면 정부가 이득도 손해도 보지 않는 공정한 판이다. 임시값.
+    win-chance: 0.5
+    # 같은 플레이어가 연달아 던질 수 있는 최소 간격(초)
+    cooldown-seconds: 2

@@ -10,6 +10,9 @@ import dev.doyu.econet.paper.admin.OfflinePlayerItems
 import dev.doyu.econet.paper.admin.ReadOnlyGuard
 import dev.doyu.econet.paper.admin.SnapshotBackup
 import dev.doyu.econet.paper.bounty.BountyOffice
+import dev.doyu.econet.paper.casino.CasinoCommand
+import dev.doyu.econet.paper.casino.CasinoMachines
+import dev.doyu.econet.paper.casino.CoinFlipTable
 import dev.doyu.econet.paper.cash.CashDesk
 import dev.doyu.econet.paper.cash.CoinGuard
 import dev.doyu.econet.paper.cash.CoinItems
@@ -97,6 +100,8 @@ class EconetPlugin : JavaPlugin() {
         val backup = SnapshotBackup(server, ledger, offlineItems, dataFolder.resolve("backups"), settings.backupsToKeep, clock)
         scheduleBackups(backup, settings.backupInterval)
 
+        val casinoMachines = CasinoMachines(dataFolder.resolve("casino.yml"))
+        server.pluginManager.registerEvents(CoinFlipTable(ledger, casinoMachines, coins, settings.coinFlip, money, server, logger, ::alertAdmins), this)
         server.pluginManager.registerEvents(LockNotice(ledger), this)
         server.pluginManager.registerEvents(ReadOnlyGuard(), this)
         server.pluginManager.registerEvents(DeathInsurance(ledger, policies, settings.insurancePremium, coins::isCoin, money, logger), this)
@@ -116,6 +121,7 @@ class EconetPlugin : JavaPlugin() {
             commands.register("insurance", "사망 보험에 가입하거나 해지합니다.", listOf("보험"), InsuranceCommand(policies, settings.insurancePremium, money))
             commands.register("shop", "정부 상점을 엽니다.", listOf("상점"), ShopCommand(shop))
             commands.register("shopadmin", "상점 품목을 추가하거나 뺍니다.", listOf("상점관리"), ShopAdminCommand(shopCatalog, money, logger))
+            commands.register("casino", "도박 기계를 등록하거나 지웁니다.", listOf("카지노"), CasinoCommand(casinoMachines))
             commands.register("econet", "장부를 점검합니다.", listOf("경제"), EconetCommand(ledger, integrity, cashDesk, inspector, census, backup, money, scope, server, logger))
         }
     }
