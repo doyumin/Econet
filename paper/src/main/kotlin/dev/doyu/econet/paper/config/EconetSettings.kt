@@ -17,6 +17,14 @@ data class EconetSettings(
     val bountyRewards: Map<String, Amount>,
     /** 등록 순서대로 상점에 진열한다. */
     val shopPrices: Map<String, Amount>,
+    val coinFlip: CoinFlipSettings,
+)
+
+data class CoinFlipSettings(
+    /** 화면에 놓이는 순서대로, 작은 것부터. 최대 9개. */
+    val bets: List<Amount>,
+    val winChance: Double,
+    val cooldown: Duration,
 )
 
 data class BuybackSettings(
@@ -54,6 +62,7 @@ fun readSettings(config: ConfigurationSection): EconetSettings {
         insurancePremium = Amount(config.requirePositiveLong("insurance.premium")),
         bountyRewards = config.readAmounts("bounty.rewards"),
         shopPrices = config.readAmounts("shop.items"),
+        coinFlip = readCoinFlip(config),
         buyback = BuybackSettings(
             prices = buybackPrices,
             pricing = DynamicPricing(
@@ -62,6 +71,22 @@ fun readSettings(config: ConfigurationSection): EconetSettings {
                 recoveryTime = Duration.ofHours(config.requirePositiveLong("buyback.dynamic.recovery-hours")),
             ),
         ),
+    )
+}
+
+private fun readCoinFlip(config: ConfigurationSection): CoinFlipSettings {
+    val bets = config.getLongList("casino.coin-flip.bets")
+    require(bets.size in 1..9) { "casino.coin-flip.bets must have 1 to 9 entries" }
+    require(bets.all { it > 0 }) { "casino.coin-flip.bets must be positive" }
+    require(bets.zipWithNext().all { (a, b) -> a < b }) { "casino.coin-flip.bets must be strictly increasing" }
+    val chancePath = "casino.coin-flip.win-chance"
+    require(config.isDouble(chancePath) || config.isInt(chancePath)) { "$chancePath must be a number" }
+    val chance = config.getDouble(chancePath)
+    require(chance > 0.0 && chance < 1.0) { "$chancePath must be between 0 and 1 exclusive" }
+    return CoinFlipSettings(
+        bets = bets.map(::Amount),
+        winChance = chance,
+        cooldown = Duration.ofSeconds(config.requirePositiveLong("casino.coin-flip.cooldown-seconds")),
     )
 }
 
